@@ -30,7 +30,22 @@ function App() {
               </Authenticator>
             }
           />
-          <Route path="/dotos" element={<DotosPage />} />
+          <Route
+            path="/dotos"
+            element={
+              <Authenticator>
+                {({ signOut, user }) => (
+                  <main>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <span>Logged in as: {user?.username}</span>
+                      <button onClick={signOut}>Sign out</button>
+                    </div>
+                    <DotosPage />
+                  </main>
+                )}
+              </Authenticator>
+            }
+          />
         </Routes>
       </div>
     </BrowserRouter>

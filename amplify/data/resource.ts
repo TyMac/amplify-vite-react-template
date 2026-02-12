@@ -255,7 +255,7 @@ const schema = a.schema({
     .model({
       content: a.string(),
     })
-    .authorization((allow) => [allow.publicApiKey()]),
+    .authorization((allow) => [allow.owner()]),
 
   // ============================================
   // GEMINI AI - Custom queries via Lambda
