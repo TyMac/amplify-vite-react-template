@@ -18,7 +18,7 @@ function App() {
           <Route
             path="/"
             element={
-              <Authenticator socialProviders={['google']}>
+              <Authenticator socialProviders={['google', 'apple']}>
                 {({ signOut, user }) => (
                   <main>
                     <h1>Hello {user?.username}</h1>
