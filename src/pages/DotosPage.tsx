@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Schema } from "../../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 
-const client = generateClient<Schema>();
+const client = generateClient<Schema>({ authMode: "userPool" });
 
 function DotosPage() {
   const [dotos, setDotos] = useState<Array<Schema["Doto"]["type"]>>([]);
