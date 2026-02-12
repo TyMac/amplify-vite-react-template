@@ -16,13 +16,23 @@ export const auth = defineAuth({
         },
         scopes: ['email', 'profile'],
       },
+      signInWithApple: {
+        clientId: secret('APPLE_CLIENT_ID'),
+        teamId: secret('APPLE_TEAM_ID'),
+        keyId: secret('APPLE_KEY_ID'),
+        privateKey: secret('APPLE_PRIVATE_KEY'),
+        attributeMapping: {
+          email: 'email',
+        },
+        scopes: ['email', 'name'],
+      },
       callbackUrls: [
-        'http://localhost:5173/',
+        'exp://r_ecrrw-tymac-8081.exp.direct',
         'https://main.d1dfxp3jics5eo.amplifyapp.com/',
         'https://dev.d1dfxp3jics5eo.amplifyapp.com/',
       ],
       logoutUrls: [
-        'http://localhost:5173/',
+        'exp://r_ecrrw-tymac-8081.exp.direct',
         'https://main.d1dfxp3jics5eo.amplifyapp.com/',
         'https://dev.d1dfxp3jics5eo.amplifyapp.com/',
       ],
