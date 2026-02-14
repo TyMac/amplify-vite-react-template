@@ -1,7 +1,6 @@
 import { Authenticator } from "@aws-amplify/ui-react";
 import "@aws-amplify/ui-react/styles.css";
 import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
-import DotosPage from "./pages/DotosPage";
 import ChatHistoryPage from "./pages/ChatHistoryPage";
 import "./App.css";
 
@@ -13,7 +12,6 @@ function App() {
           <Link to="/" style={{ marginRight: "20px" }}>
             Home
           </Link>
-          <Link to="/dotos" style={{ marginRight: "20px" }}>Dotos</Link>
           <Link to="/chats">Chats</Link>
         </nav>
         <Routes>
@@ -26,23 +24,7 @@ function App() {
                     <h1>Hello {user?.username}</h1>
                     <button onClick={signOut}>Sign out</button>
                     <br />
-                    <Link to="/dotos">Go to Dotos</Link>
-                  </main>
-                )}
-              </Authenticator>
-            }
-          />
-          <Route
-            path="/dotos"
-            element={
-              <Authenticator>
-                {({ signOut, user }) => (
-                  <main>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                      <span>Logged in as: {user?.username}</span>
-                      <button onClick={signOut}>Sign out</button>
-                    </div>
-                    <DotosPage />
+                    <Link to="/chats">Go to Chats</Link>
                   </main>
                 )}
               </Authenticator>

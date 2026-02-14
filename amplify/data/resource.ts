@@ -249,15 +249,6 @@ const schema = a.schema({
     ]),
 
   // ============================================
-  // DOTOS - Simple todo-like items for demo
-  // ============================================
-  Doto: a
-    .model({
-      content: a.string(),
-    })
-    .authorization((allow) => [allow.owner()]),
-
-  // ============================================
   // GEMINI AI - Custom queries via Lambda
   // ============================================
   geminiChat: a

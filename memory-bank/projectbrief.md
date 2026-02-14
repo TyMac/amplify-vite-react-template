@@ -5,9 +5,9 @@ A React application using Vite and AWS Amplify Gen 2, featuring authentication (
 
 ## Core Features
 - Authentication: Email and Social login via Amplify Authenticator.
-- Data: Private "Dotos" (todos) list for authenticated users.
+- Data: View chat history from the companion `barista-mobile` app.
 - Stack: React, Vite, AWS Amplify Gen 2 (Auth, Data).
 
 ## Goals
-- Provide a secure, per-user data store for Dotos.
+- Provide a secure, per-user view of cross-platform data (Chat Sessions).
 - Demonstrate best practices for Amplify Gen 2 integration.

@@ -1,25 +1,27 @@
 # Active Context: Dotos Privacy & Authentication
 
 ## Current State
-- The `/dotos` route is private and protected by `Authenticator`.
-- `Doto` model uses `allow.owner()` for per-user data isolation.
+- The `/chats` route is private and protected by `Authenticator`.
+- `Dotos` feature has been removed.
 - Amplify configuration is isolated in `src/configureAmplify.ts`.
-- Data client in `DotosPage` uses `authMode: "userPool"`.
+- `ChatSession` model uses `allow.owner()` for per-user data isolation.
+- Data client uses `authMode: "userPool"`.
 
 ## Recent Changes
-- **Protected `/dotos` route**: Added `Authenticator` wrapper in `src/App.tsx`.
-- **Private Data Model**: Updated `amplify/data/resource.ts` to use `allow.owner()` for `Doto`.
+- **Removed Dotos**: Deleted `DotosPage.tsx`, removed `Doto` model from schema, and cleaned up routing.
+- **Added Chats Feature**: Created `ChatHistoryPage.tsx` to view chat sessions from the `barista-mobile` app.
+- **Cross-Project Integration**: Updated `barista-mobile` app to use `authMode: "userPool"` for chat storage, ensuring ownership matches.
+- **Protected `/chats` route**: Added `Authenticator` wrapper in `src/App.tsx`.
 - **Fixed Configuration Timing**: Created `src/configureAmplify.ts` and imported it first in `src/main.tsx` to resolve "Amplify has not been configured" error.
-- **Fixed Auth Mode Mismatch**: Updated `src/pages/DotosPage.tsx` to use explicit `authMode: "userPool"` to resolve `onCreate` errors caused by the API default being `apiKey`.
 
 ## Issue Resolution Log
 
 ### Issue 1: "Amplify has not been configured"
 **Problem**: The application threw an error on startup stating Amplify was not configured.
-**Cause**: JavaScript import hoisting caused `generateClient()` in `DotosPage.tsx` (imported via `App.tsx`) to run *before* `Amplify.configure()` in `main.tsx`.
+**Cause**: JavaScript import hoisting caused `generateClient()` in page components (imported via `App.tsx`) to run *before* `Amplify.configure()` in `main.tsx`.
 **Solution**: Moved configuration to `src/configureAmplify.ts` and imported it at the very top of `src/main.tsx`, guaranteeing it runs first.
 
-### Issue 2: `onCreate` Error (Authorization Mismatch)
-**Problem**: Creating a Doto failed silently or with a generic `onCreate` error, despite being logged in.
-**Cause**: The API's `defaultAuthorizationMode` was `apiKey` (public), but the `Doto` model required `owner` (User Pool) access. The client defaulted to using the API Key, which was rejected by the backend for the private model.
-**Solution**: Explicitly configured the client in `DotosPage.tsx` with `generateClient<Schema>({ authMode: "userPool" })` to force the use of Cognito credentials.
+### Issue 2: Chat Visibility Mismatch
+**Problem**: Chats created in `barista-mobile` were not visible in the web app.
+**Cause**: The mobile app was using API Key (public) auth, while the web app queries using User Pool (owner) auth. Items created publicly did not have the `owner` field set.
+**Solution**: Updated `barista-mobile` to use `authMode: "userPool"` for authenticated users, ensuring the `owner` field is populated.
