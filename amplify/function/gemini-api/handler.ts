@@ -165,12 +165,12 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
     console.log('Received response from Vertex AI:', JSON.stringify(result, null, 2));
     let responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
 
-    // Check for RAG refusal ("I don't have information...")
-    // This happens when Grounding checks fail despite the system prompt
-    const refusalRegex = /I (am sorry, but I )?do not have .*information/i;
+    // Check for RAG refusal ("I don't have information...", "I can't provide...", "I only have info for...")
+    // This happens when Grounding checks fail or the model gets confused by limited context
+    const refusalRegex = /(do not|don't|can't|cannot) (have|provide|find|give).*(information|details|settings)|(only have information for)/i;
     
     if (refusalRegex.test(responseText)) {
-      console.log('RAG Refusal detected. Retrying without tools (Hybrid Fallback).');
+      console.log('RAG Refusal/Constraint detected. Retrying without tools (Hybrid Fallback).');
       
       // Remove tools to force internal knowledge usage
       const fallbackPayload = { ...payload };
