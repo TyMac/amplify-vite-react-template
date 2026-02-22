@@ -153,8 +153,10 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
 
   try {
     console.log(`Using model (forced update): ${model}`);
+    console.log('Sending payload to Vertex AI:', JSON.stringify(payload, null, 2));
     const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
 
+    console.log('Received response from Vertex AI:', JSON.stringify(result, null, 2));
     const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
     
     return JSON.stringify({
