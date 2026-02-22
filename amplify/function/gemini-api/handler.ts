@@ -145,10 +145,16 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
             ragCorpus: RAG_CORPUS_ID
           }],
           similarityTopK: 5,
-          vectorDistanceThreshold: 0.7
+          vectorDistanceThreshold: 0.55
         }
       }
     }];
+  }
+
+  // Update system prompt to be extremely explicit about fallback
+  if (payload.systemInstruction && payload.systemInstruction.parts) {
+    const originalPrompt = payload.systemInstruction.parts[0].text;
+    payload.systemInstruction.parts[0].text = `${originalPrompt}\n\nCRITICAL INSTRUCTION: If the RAG documents do not contain the answer (or are irrelevant), you MUST use your internal knowledge to answer. Do not say "I don't have information" unless the topic is completely outside your training. You are an expert barista; use your training!`;
   }
 
   try {
