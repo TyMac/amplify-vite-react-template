@@ -160,10 +160,29 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
   try {
     console.log(`Using model (forced update): ${model}`);
     console.log('Sending payload to Vertex AI:', JSON.stringify(payload, null, 2));
-    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
+    let result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
 
     console.log('Received response from Vertex AI:', JSON.stringify(result, null, 2));
-    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
+    let responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
+
+    // Check for RAG refusal ("I don't have information...")
+    // This happens when Grounding checks fail despite the system prompt
+    const refusalRegex = /I (am sorry, but I )?do not have .*information/i;
+    
+    if (refusalRegex.test(responseText)) {
+      console.log('RAG Refusal detected. Retrying without tools (Hybrid Fallback).');
+      
+      // Remove tools to force internal knowledge usage
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.tools;
+      
+      // We keep the system prompt but might want to slightly tweak it or trust the existing one
+      // The existing one already says "use your training", which works well without tools.
+      
+      result = await callVertexAI(`publishers/google/models/${model}:generateContent`, fallbackPayload);
+      console.log('Received Fallback response:', JSON.stringify(result, null, 2));
+      responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
+    }
     
     return JSON.stringify({
       response: responseText,
