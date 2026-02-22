@@ -10,6 +10,7 @@ const WORKLOAD_POOL_ID = process.env.WORKLOAD_POOL_ID || 'aws-barista';
 const WORKLOAD_PROVIDER_ID = process.env.WORKLOAD_PROVIDER_ID || 'aws-lambda';
 const SERVICE_ACCOUNT_EMAIL = process.env.SERVICE_ACCOUNT_EMAIL || 'barista-vertex-ai@deductive-jet-464913-p8.iam.gserviceaccount.com';
 const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-central1';
+const RAG_CORPUS_ID = process.env.RAG_CORPUS_ID;
 
 // Construct the workload identity provider path
 const WORKLOAD_IDENTITY_PROVIDER = `//iam.googleapis.com/projects/${GCP_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_POOL_ID}/providers/${WORKLOAD_PROVIDER_ID}`;
@@ -62,7 +63,7 @@ async function callVertexAI(endpoint: string, payload: any): Promise<any> {
     url,
     method: 'POST',
     data: payload,
-  });
+  } as any);
 
   return response.data;
 }
@@ -114,27 +115,45 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
     parts: [{ text: msg.content }],
   }));
 
-  // Add system prompt as first message if provided
-  if (systemPrompt) {
-    contents.unshift({
-      role: 'user',
-      parts: [{ text: systemPrompt }],
-    });
-  }
-
   // Use only the requested model
   const model = 'gemini-2.0-flash-lite-001';
 
+  // Prepare request payload
+  const payload: any = {
+    contents,
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 1024,
+      topP: 0.95,
+    },
+  };
+
+  // Add system instruction if provided
+  if (systemPrompt) {
+    payload.systemInstruction = {
+      parts: [{ text: systemPrompt }]
+    };
+  }
+
+  // Add RAG tools if corpus ID is available
+  if (RAG_CORPUS_ID) {
+    console.log('Using RAG Corpus:', RAG_CORPUS_ID);
+    payload.tools = [{
+      retrieval: {
+        vertexRagStore: {
+          ragResources: [{
+            ragCorpus: RAG_CORPUS_ID
+          }],
+          similarityTopK: 3,
+          vectorDistanceThreshold: 0.5
+        }
+      }
+    }];
+  }
+
   try {
     console.log(`Using model (forced update): ${model}`);
-    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, {
-      contents,
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 1024,
-        topP: 0.95,
-      },
-    });
+    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
 
     const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
     
