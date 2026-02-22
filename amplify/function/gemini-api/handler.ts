@@ -144,8 +144,8 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
           ragResources: [{
             ragCorpus: RAG_CORPUS_ID
           }],
-          similarityTopK: 3,
-          vectorDistanceThreshold: 0.5
+          similarityTopK: 5,
+          vectorDistanceThreshold: 0.7
         }
       }
     }];
