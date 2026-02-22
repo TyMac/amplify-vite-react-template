@@ -136,26 +136,26 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
   }
 
   // Add RAG tools if corpus ID is available
-  if (RAG_CORPUS_ID) {
-    console.log('Using RAG Corpus:', RAG_CORPUS_ID);
-    payload.tools = [{
-      retrieval: {
-        vertexRagStore: {
-          ragResources: [{
-            ragCorpus: RAG_CORPUS_ID
-          }],
-          similarityTopK: 5,
-          vectorDistanceThreshold: 0.55
-        }
-      }
-    }];
-  }
+  // if (RAG_CORPUS_ID) {
+  //   console.log('Using RAG Corpus:', RAG_CORPUS_ID);
+  //   payload.tools = [{
+  //     retrieval: {
+  //       vertexRagStore: {
+  //         ragResources: [{
+  //           ragCorpus: RAG_CORPUS_ID
+  //         }],
+  //         similarityTopK: 5,
+  //         vectorDistanceThreshold: 0.55
+  //       }
+  //     }
+  //   }];
+  // }
 
   // Update system prompt to be extremely explicit about fallback
-  if (payload.systemInstruction && payload.systemInstruction.parts) {
-    const originalPrompt = payload.systemInstruction.parts[0].text;
-    payload.systemInstruction.parts[0].text = `${originalPrompt}\n\nCRITICAL INSTRUCTION: If the RAG documents do not contain the answer (or are irrelevant), you MUST use your internal knowledge to answer. Do not say "I don't have information" unless the topic is completely outside your training. You are an expert barista; use your training!`;
-  }
+  // if (payload.systemInstruction && payload.systemInstruction.parts) {
+  //   const originalPrompt = payload.systemInstruction.parts[0].text;
+  //   payload.systemInstruction.parts[0].text = `${originalPrompt}\n\nCRITICAL INSTRUCTION: If the RAG documents do not contain the answer (or are irrelevant), you MUST use your internal knowledge to answer. Do not say "I don't have information" unless the topic is completely outside your training. You are an expert barista; use your training!`;
+  // }
 
   try {
     console.log(`Using model (forced update): ${model}`);
@@ -167,22 +167,22 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
 
     // Check for RAG refusal ("I don't have information...", "I can't provide...", "I only have info for...")
     // This happens when Grounding checks fail or the model gets confused by limited context
-    const refusalRegex = /(do not|don't|can't|cannot) (have|provide|find|give).*(information|details|settings)|(only have information for)/i;
+    // const refusalRegex = /(do not|don't|can't|cannot) (have|provide|find|give).*(information|details|settings)|(only have information for)/i;
     
-    if (refusalRegex.test(responseText)) {
-      console.log('RAG Refusal/Constraint detected. Retrying without tools (Hybrid Fallback).');
+    // if (refusalRegex.test(responseText)) {
+    //   console.log('RAG Refusal/Constraint detected. Retrying without tools (Hybrid Fallback).');
       
-      // Remove tools to force internal knowledge usage
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.tools;
+    //   // Remove tools to force internal knowledge usage
+    //   const fallbackPayload = { ...payload };
+    //   delete fallbackPayload.tools;
       
-      // We keep the system prompt but might want to slightly tweak it or trust the existing one
-      // The existing one already says "use your training", which works well without tools.
+    //   // We keep the system prompt but might want to slightly tweak it or trust the existing one
+    //   // The existing one already says "use your training", which works well without tools.
       
-      result = await callVertexAI(`publishers/google/models/${model}:generateContent`, fallbackPayload);
-      console.log('Received Fallback response:', JSON.stringify(result, null, 2));
-      responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
-    }
+    //   result = await callVertexAI(`publishers/google/models/${model}:generateContent`, fallbackPayload);
+    //   console.log('Received Fallback response:', JSON.stringify(result, null, 2));
+    //   responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
+    // }
     
     return JSON.stringify({
       response: responseText,
