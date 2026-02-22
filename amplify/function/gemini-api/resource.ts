@@ -11,6 +11,6 @@ export const geminiApi = defineFunction({
     WORKLOAD_POOL_ID: 'aws-barista',
     WORKLOAD_PROVIDER_ID: 'aws-lambda',
     SERVICE_ACCOUNT_EMAIL: 'barista-vertex-ai@deductive-jet-464913-p8.iam.gserviceaccount.com',
-    VERTEX_LOCATION: 'us-central1',
+    VERTEX_LOCATION: 'us-south1',
   },
 });
