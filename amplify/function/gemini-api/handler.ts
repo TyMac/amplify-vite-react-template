@@ -87,10 +87,10 @@ async function queryRAG(userMessage: string): Promise<string> {
       url,
       method: 'POST',
       data: {
-        vertex_rag_store: {
-          rag_resources: [{ rag_corpus: RAG_CORPUS }],
-          similarity_top_k: 5,
-          vector_distance_threshold: 0.3,
+        vertexRagStore: {
+          ragResources: [{ ragCorpus: RAG_CORPUS }],
+          similarityTopK: 5,
+          vectorDistanceThreshold: 0.3,
         },
         query: {
           text: userMessage,
