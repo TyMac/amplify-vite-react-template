@@ -83,11 +83,7 @@ async function queryRAG(userMessage: string): Promise<string> {
     const client = await getGCPClient();
     const url = `https://${RAG_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${GCP_PROJECT_ID}/locations/${RAG_LOCATION}:retrieveContexts`;
 
-    // Enhance query to help vector search find the right category
-    // Raw user messages like "what about cafec t-92?" may not embed close to
-    // equipment profile documents. Prepending category hints improves retrieval.
-    const queryText = `coffee brewing equipment profile: ${userMessage}`;
-    console.log('RAG query text:', queryText);
+    console.log('RAG query text:', userMessage);
 
     const response = await client.request({
       url,
@@ -97,7 +93,7 @@ async function queryRAG(userMessage: string): Promise<string> {
           ragResources: [{ ragCorpus: RAG_CORPUS }],
         },
         query: {
-          text: queryText,
+          text: userMessage,
           similarityTopK: 10,
         },
       },
