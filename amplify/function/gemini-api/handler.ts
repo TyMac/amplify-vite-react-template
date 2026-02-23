@@ -9,8 +9,9 @@ const GCP_PROJECT_NUMBER = process.env.GCP_PROJECT_NUMBER || '720226322251';
 const WORKLOAD_POOL_ID = process.env.WORKLOAD_POOL_ID || 'aws-barista';
 const WORKLOAD_PROVIDER_ID = process.env.WORKLOAD_PROVIDER_ID || 'aws-lambda';
 const SERVICE_ACCOUNT_EMAIL = process.env.SERVICE_ACCOUNT_EMAIL || 'barista-vertex-ai@deductive-jet-464913-p8.iam.gserviceaccount.com';
-const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-central1';
-const RAG_CORPUS_ID = process.env.RAG_CORPUS_ID;
+const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-south1';
+const RAG_LOCATION = process.env.RAG_LOCATION || 'us-south1';
+const RAG_CORPUS = process.env.RAG_CORPUS || 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904';
 
 // Construct the workload identity provider path
 const WORKLOAD_IDENTITY_PROVIDER = `//iam.googleapis.com/projects/${GCP_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_POOL_ID}/providers/${WORKLOAD_PROVIDER_ID}`;
@@ -69,6 +70,56 @@ async function callVertexAI(endpoint: string, payload: any): Promise<any> {
 }
 
 /**
+ * Query the RAG corpus for relevant equipment profiles, recipes, and troubleshooting data.
+ * Returns retrieved text chunks to enrich the Gemini prompt.
+ * If retrieval fails or returns nothing, returns empty string (graceful degradation).
+ *
+ * NOTE: This replaces the old tools.retrieval.vertexRagStore approach which caused
+ * Gemini to treat RAG as a grounding constraint (refusing to answer when no docs matched).
+ * Manual retrieval + prompt injection lets Gemini use its full knowledge supplemented by RAG.
+ */
+async function queryRAG(userMessage: string): Promise<string> {
+  try {
+    const client = await getGCPClient();
+    const url = `https://${RAG_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${GCP_PROJECT_ID}/locations/${RAG_LOCATION}:retrieveContexts`;
+
+    const response = await client.request({
+      url,
+      method: 'POST',
+      data: {
+        vertex_rag_store: {
+          rag_resources: [{ rag_corpus: RAG_CORPUS }],
+          similarity_top_k: 5,
+          vector_distance_threshold: 0.3,
+        },
+        query: {
+          text: userMessage,
+        },
+      },
+    } as any);
+
+    const contexts = (response.data as any)?.contexts?.contexts;
+    if (!contexts || contexts.length === 0) {
+      console.log('RAG: No relevant contexts found');
+      return '';
+    }
+
+    console.log(`RAG: Retrieved ${contexts.length} context(s)`);
+
+    const chunks = contexts.map((ctx: any, i: number) => {
+      const source = ctx.source_display_name || ctx.source_uri || `Source ${i + 1}`;
+      const score = ctx.score ? ` (relevance: ${ctx.score.toFixed(3)})` : '';
+      return `### ${source}${score}\n${ctx.text}`;
+    });
+
+    return chunks.join('\n\n');
+  } catch (error: any) {
+    console.error('RAG retrieval failed (non-fatal):', error.message);
+    return '';
+  }
+}
+
+/**
  * AppSync Lambda handler
  * Routes to appropriate function based on field name
  */
@@ -109,6 +160,27 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
   // Parse messages from JSON strings
   const messages: Array<{ role: string; content: string }> = messagesJson.map(m => JSON.parse(m));
 
+  // Get the latest user message for RAG retrieval
+  const latestUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || '';
+
+  // Query RAG corpus for relevant equipment profiles, recipes, etc.
+  const ragContext = await queryRAG(latestUserMessage);
+
+  // Build enriched system prompt: base prompt + RAG context
+  let enrichedPrompt = systemPrompt || '';
+  if (ragContext) {
+    enrichedPrompt += `\n\n--- CURATED REFERENCE DATA ---
+The following profiles and guides were retrieved from our curated knowledge base.
+Use your full barista expertise to answer naturally, but when this reference data
+contains specific guidance (grind settings, flow rates, synergies, warnings),
+PREFER this data over your general training. Weave the information into your
+response conversationally — do not just quote it back verbatim.
+
+${ragContext}
+--- END REFERENCE DATA ---`;
+    console.log(`RAG context injected (${ragContext.length} chars)`);
+  }
+
   // Convert messages to Gemini format
   const contents = messages.map((msg) => ({
     role: msg.role === 'assistant' ? 'model' : 'user',
@@ -128,61 +200,18 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
     },
   };
 
-  // Add system instruction if provided
-  if (systemPrompt) {
+  // Add system instruction if provided (now enriched with RAG context)
+  if (enrichedPrompt) {
     payload.systemInstruction = {
-      parts: [{ text: systemPrompt }]
+      parts: [{ text: enrichedPrompt }]
     };
   }
 
-  // Add RAG tools if corpus ID is available
-  // if (RAG_CORPUS_ID) {
-  //   console.log('Using RAG Corpus:', RAG_CORPUS_ID);
-  //   payload.tools = [{
-  //     retrieval: {
-  //       vertexRagStore: {
-  //         ragResources: [{
-  //           ragCorpus: RAG_CORPUS_ID
-  //         }],
-  //         similarityTopK: 5,
-  //         vectorDistanceThreshold: 0.55
-  //       }
-  //     }
-  //   }];
-  // }
-
-  // Update system prompt to be extremely explicit about fallback
-  // if (payload.systemInstruction && payload.systemInstruction.parts) {
-  //   const originalPrompt = payload.systemInstruction.parts[0].text;
-  //   payload.systemInstruction.parts[0].text = `${originalPrompt}\n\nCRITICAL INSTRUCTION: If the RAG documents do not contain the answer (or are irrelevant), you MUST use your internal knowledge to answer. Do not say "I don't have information" unless the topic is completely outside your training. You are an expert barista; use your training!`;
-  // }
-
   try {
-    console.log(`Using model (forced update): ${model}`);
-    console.log('Sending payload to Vertex AI:', JSON.stringify(payload, null, 2));
-    let result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
+    console.log(`Using model: ${model}`);
+    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
 
-    console.log('Received response from Vertex AI:', JSON.stringify(result, null, 2));
-    let responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
-
-    // Check for RAG refusal ("I don't have information...", "I can't provide...", "I only have info for...")
-    // This happens when Grounding checks fail or the model gets confused by limited context
-    // const refusalRegex = /(do not|don't|can't|cannot) (have|provide|find|give).*(information|details|settings)|(only have information for)/i;
-    
-    // if (refusalRegex.test(responseText)) {
-    //   console.log('RAG Refusal/Constraint detected. Retrying without tools (Hybrid Fallback).');
-      
-    //   // Remove tools to force internal knowledge usage
-    //   const fallbackPayload = { ...payload };
-    //   delete fallbackPayload.tools;
-      
-    //   // We keep the system prompt but might want to slightly tweak it or trust the existing one
-    //   // The existing one already says "use your training", which works well without tools.
-      
-    //   result = await callVertexAI(`publishers/google/models/${model}:generateContent`, fallbackPayload);
-    //   console.log('Received Fallback response:', JSON.stringify(result, null, 2));
-    //   responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
-    // }
+    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
     
     return JSON.stringify({
       response: responseText,
