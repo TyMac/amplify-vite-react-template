@@ -92,8 +92,7 @@ async function queryRAG(userMessage: string): Promise<string> {
         },
         query: {
           text: userMessage,
-          similarityTopK: 5,
-          vectorDistanceThreshold: 0.3,
+          similarityTopK: 10,
         },
       },
     } as any);
