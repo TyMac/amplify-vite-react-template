@@ -166,20 +166,27 @@ async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
   // Query RAG corpus for relevant equipment profiles, recipes, etc.
   const ragContext = await queryRAG(latestUserMessage);
 
-  // Build enriched system prompt: base prompt + RAG context
-  let enrichedPrompt = systemPrompt || '';
+  // Build enriched system prompt: RAG context FIRST, then base prompt
+  // Placing corrections before the general instructions gives them higher priority
+  let enrichedPrompt = '';
   if (ragContext) {
-    enrichedPrompt += `\n\n--- CURATED REFERENCE DATA ---
-The following profiles and guides were retrieved from our curated knowledge base.
-Use your full barista expertise to answer naturally, but when this reference data
-contains specific guidance (grind settings, flow rates, synergies, warnings),
-PREFER this data over your general training. Weave the information into your
-response conversationally — do not just quote it back verbatim.
+    enrichedPrompt += `MANDATORY REFERENCE DATA — YOU MUST USE THIS:
+The following equipment profiles are VERIFIED FACTS from our curated database.
+When this data specifies flow rates, grind adjustments, temperatures, or warnings,
+you MUST use these values. Do NOT contradict this data with your general knowledge.
+For example, if this data says a filter is "very slow," do NOT say it is "fast" or
+"slightly faster." The reference data is ALWAYS correct.
 
 ${ragContext}
---- END REFERENCE DATA ---`;
+
+END OF REFERENCE DATA.
+Use the above data in your response. Now follow the general instructions below.
+
+`;
     console.log(`RAG context injected (${ragContext.length} chars)`);
+    console.log('RAG content preview:', ragContext.substring(0, 500));
   }
+  enrichedPrompt += systemPrompt || '';
 
   // Convert messages to Gemini format
   const contents = messages.map((msg) => ({
