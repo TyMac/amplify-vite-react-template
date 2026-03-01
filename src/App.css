@@ -1,42 +1,16 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+/* Amplify Authenticator overrides to match Barista theme */
+[data-amplify-authenticator] {
+  --amplify-colors-brand-primary-10: #FDF5F0;
+  --amplify-colors-brand-primary-20: #F5DFD0;
+  --amplify-colors-brand-primary-40: #DBA880;
+  --amplify-colors-brand-primary-60: #C87A48;
+  --amplify-colors-brand-primary-80: #B8693C;
+  --amplify-colors-brand-primary-90: #A05830;
+  --amplify-colors-brand-primary-100: #8A4A28;
+  --amplify-components-button-primary-background-color: #B8693C;
+  --amplify-components-button-primary-hover-background-color: #A05830;
+  --amplify-components-tabs-item-active-border-color: #B8693C;
+  --amplify-components-tabs-item-active-color: #B8693C;
+  --amplify-components-authenticator-router-border-width: 0;
+  --amplify-components-authenticator-router-box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
