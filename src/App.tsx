@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-do
 import { ThemeProvider } from "./contexts/ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
 import ChatHistoryPage from "./pages/ChatHistoryPage";
+import ChatPage from "./pages/ChatPage";
 import "./App.css";
 
 function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () => void }) {
@@ -26,10 +27,16 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
             Home
           </Link>
           <Link
+            to="/chat"
+            className={`btn btn-ghost btn-sm ${location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") ? "text-primary" : ""}`}
+          >
+            Chat
+          </Link>
+          <Link
             to="/chats"
             className={`btn btn-ghost btn-sm ${location.pathname === "/chats" ? "text-primary" : ""}`}
           >
-            Chats
+            History
           </Link>
         </nav>
         <ThemeToggle />
@@ -74,31 +81,47 @@ function HomePage() {
             {/* Action Cards */}
             <div className="w-full max-w-md flex flex-col gap-5">
               <Link
-                to="/chats"
+                to="/chat"
                 className="card bg-primary text-primary-content shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
               >
                 <div className="card-body items-center text-center py-8">
-                  <span className="text-3xl mb-2">💬</span>
-                  <h2 className="card-title text-xl font-semibold">Chat History</h2>
+                  <span className="text-3xl mb-2">☕</span>
+                  <h2 className="card-title text-xl font-semibold">Start Chatting</h2>
                   <p className="text-primary-content/80 text-sm font-light">
-                    View your conversations with AI Barista
+                    Get personalized brew recipes and coffee advice
                   </p>
                 </div>
               </Link>
 
-              <div className="card bg-base-100 border border-base-200 shadow-md">
+              <Link
+                to="/chats"
+                className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+              >
                 <div className="card-body items-center text-center py-6">
-                  <span className="text-2xl mb-2">📱</span>
+                  <span className="text-2xl mb-2">💬</span>
                   <h2 className="card-title text-lg font-medium text-primary">
-                    Get the App
+                    Chat History
                   </h2>
                   <p className="text-base-content/50 text-sm font-light">
-                    Chat, scan beans, find shops — all from your phone
+                    View and continue past conversations
                   </p>
                 </div>
-              </div>
+              </Link>
             </div>
           </div>
+        </div>
+      )}
+    </Authenticator>
+  );
+}
+
+function LiveChatPage() {
+  return (
+    <Authenticator>
+      {({ signOut, user }) => (
+        <div className="h-screen flex flex-col bg-base-300">
+          <NavBar user={user} signOut={signOut} />
+          <ChatPage />
         </div>
       )}
     </Authenticator>
@@ -124,6 +147,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/chat" element={<LiveChatPage />} />
+          <Route path="/chat/:sessionId" element={<LiveChatPage />} />
           <Route path="/chats" element={<ChatsPage />} />
         </Routes>
       </BrowserRouter>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { Schema } from "../../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
 
@@ -12,6 +13,7 @@ interface ChatMessage {
 }
 
 function ChatHistoryPage() {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<
     Array<Schema["ChatSession"]["type"]>
   >([]);
@@ -64,9 +66,17 @@ function ChatHistoryPage() {
 
         <div className="card bg-base-100 shadow-lg">
           <div className="card-body p-4 sm:p-6">
-            <h2 className="card-title text-lg font-semibold text-base-content mb-4">
-              {selectedSession.name}
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="card-title text-lg font-semibold text-base-content">
+                {selectedSession.name}
+              </h2>
+              <button
+                onClick={() => navigate(`/chat/${selectedSession.id}`)}
+                className="btn btn-primary btn-sm gap-1"
+              >
+                Continue →
+              </button>
+            </div>
 
             <div className="flex flex-col gap-3">
               {messages.map((msg, idx) => (
