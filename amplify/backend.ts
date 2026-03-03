@@ -236,6 +236,11 @@ const dataAccessPolicy = new oss.CfnAccessPolicy(
           // This resolves the "AccessDeniedError" for "aoss:BatchGetCollection" during deployment
           // The current execution role of the CDK deployment
           `arn:aws:iam::${openSearchStack.account}:root`,
+          // Add the AWS Amplify backend deployment role if identifiable, or broaden access within account
+          // Since the deployment user is unknown in sandbox, we grant access to the account
+          // This allows any IAM principal in the account to manage the collection (use with caution in prod)
+          `arn:aws:iam::${openSearchStack.account}:role/AmplifyBackendDeployRole`, // Common role name
+          `arn:aws:iam::${openSearchStack.account}:role/amplify-backend-deploy-role`, // Alternative casing
         ],
       },
     ]),
