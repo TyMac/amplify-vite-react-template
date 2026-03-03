@@ -4,6 +4,7 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as oss from "aws-cdk-lib/aws-opensearchserverless";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as osis from "aws-cdk-lib/aws-osis";
+import * as cdk from "aws-cdk-lib";
 import { RemovalPolicy, Stack } from "aws-cdk-lib";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
 import * as YAML from "yaml";
@@ -152,6 +153,23 @@ const openSearchCollectionPolicy = new iam.PolicyStatement({
   ],
 });
 openSearchIntegrationPipelineRole.addToPolicy(openSearchCollectionPolicy);
+
+openSearchIntegrationPipelineRole.addToPolicy(
+  new iam.PolicyStatement({
+    effect: iam.Effect.ALLOW,
+    actions: [
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents",
+      "logs:DescribeLogGroups",
+      "logs:DescribeLogStreams",
+    ],
+    resources: [
+      `arn:aws:logs:${region}:${openSearchStack.account}:log-group:/aws/opensearchserverless/*`,
+      `arn:aws:logs:${region}:${openSearchStack.account}:log-group:/aws/opensearchserverless/*:log-stream:*`,
+    ],
+  })
+);
 
 // Security Policies
 const encryptionPolicy = new oss.CfnSecurityPolicy(
@@ -333,8 +351,15 @@ const cfnPipeline = new osis.CfnPipeline(
     },
   },
 );
-// Ensure pipeline waits for collection to be ready
+// Ensure pipeline waits for collection AND role policies to be ready
 cfnPipeline.addDependency(openSearchServerlessCollection);
+
+// Critical: The OSIS service validates collection connectivity at pipeline creation.
+// The role's inline policies (DefaultPolicy) must exist BEFORE the pipeline is created.
+const pipelineRoleCfn = openSearchIntegrationPipelineRole.node.findChild('DefaultPolicy').node.defaultChild as cdk.CfnResource;
+cfnPipeline.addDependency(pipelineRoleCfn);
+// Also ensure the data access policy is ready (AOSS resource-based policy)
+cfnPipeline.addDependency(dataAccessPolicy);
 
 // Grant Lambda permission to call STS (needed for Workload Identity Federation)
 // The Lambda will use its execution role credentials to authenticate to GCP
