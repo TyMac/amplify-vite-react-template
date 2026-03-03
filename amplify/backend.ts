@@ -232,20 +232,16 @@ const dataAccessPolicy = new oss.CfnAccessPolicy(
         Principal: [
           openSearchIntegrationPipelineRole.roleArn,
           httpDataSourceRoleArn,
-          // Grant the deployment role permissions to manage the collection
-          // This resolves the "AccessDeniedError" for "aoss:BatchGetCollection" during deployment
-          // The current execution role of the CDK deployment
+          // Grant permissions to account root and Admin role for deployment management
           `arn:aws:iam::${openSearchStack.account}:root`,
-          // Add the AWS Amplify backend deployment role if identifiable, or broaden access within account
-          // Since the deployment user is unknown in sandbox, we grant access to the account
-          // This allows any IAM principal in the account to manage the collection (use with caution in prod)
-          `arn:aws:iam::${openSearchStack.account}:role/AmplifyBackendDeployRole`, // Common role name
-          `arn:aws:iam::${openSearchStack.account}:role/amplify-backend-deploy-role`, // Alternative casing
+          `arn:aws:iam::${openSearchStack.account}:role/Admin`,
         ],
       },
     ]),
   },
 );
+// Ensure collection waits for data access policy before creation/updates
+openSearchServerlessCollection.addDependency(dataAccessPolicy);
 
 // OSIS Pipeline Configuration
 interface OpenSearchConfig {
@@ -333,6 +329,8 @@ const cfnPipeline = new osis.CfnPipeline(
     },
   },
 );
+// Ensure pipeline waits for collection to be ready
+cfnPipeline.addDependency(openSearchServerlessCollection);
 
 // Grant Lambda permission to call STS (needed for Workload Identity Federation)
 // The Lambda will use its execution role credentials to authenticate to GCP
