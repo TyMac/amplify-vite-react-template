@@ -237,6 +237,8 @@ const dataAccessPolicy = new oss.CfnAccessPolicy(
           // Add standard CDK execution roles used by Amplify Gen 2 deployments
           `arn:aws:iam::${openSearchStack.account}:role/cdk-hnb659fds-cfn-exec-role-${openSearchStack.account}-${region}`,
           `arn:aws:iam::${openSearchStack.account}:role/cdk-hnb659fds-deploy-role-${openSearchStack.account}-${region}`,
+          // Add Admin role as seen in example repo, just in case
+          `arn:aws:iam::${openSearchStack.account}:role/Admin`,
         ],
       },
     ]),
