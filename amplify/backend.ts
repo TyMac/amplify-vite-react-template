@@ -232,6 +232,10 @@ const dataAccessPolicy = new oss.CfnAccessPolicy(
         Principal: [
           openSearchIntegrationPipelineRole.roleArn,
           httpDataSourceRoleArn,
+          // Grant the deployment role permissions to manage the collection
+          // This resolves the "AccessDeniedError" for "aoss:BatchGetCollection" during deployment
+          // The current execution role of the CDK deployment
+          `arn:aws:iam::${openSearchStack.account}:root`,
         ],
       },
     ]),
