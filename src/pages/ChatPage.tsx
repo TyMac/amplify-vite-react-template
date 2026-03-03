@@ -73,9 +73,12 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(false);
   const [sessionList, setSessionList] = useState<ChatSession[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState("");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Load session
   useEffect(() => {
@@ -94,6 +97,14 @@ export default function ChatPage() {
       inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + "px";
     }
   }, [input]);
+
+  // Focus rename input when renaming starts
+  useEffect(() => {
+    if (renamingId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingId]);
 
   async function loadSession() {
     if (sessionId) {
@@ -146,6 +157,27 @@ export default function ChatPage() {
       await createNewChat();
     }
     await loadSessionList();
+  }
+
+  function startRename(s: ChatSession) {
+    setRenamingId(s.id);
+    setRenameText(s.name);
+  }
+
+  async function submitRename() {
+    if (!renamingId || !renameText.trim()) {
+      setRenamingId(null);
+      return;
+    }
+    await chatStorage.renameSession(renamingId, renameText.trim());
+    // Update local state
+    if (session?.id === renamingId) {
+      setSession({ ...session, name: renameText.trim() });
+    }
+    setSessionList((prev) =>
+      prev.map((s) => (s.id === renamingId ? { ...s, name: renameText.trim() } : s))
+    );
+    setRenamingId(null);
   }
 
   async function sendMessage() {
@@ -238,18 +270,48 @@ export default function ChatPage() {
                 group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer mb-1
                 ${s.id === session?.id ? "bg-primary/10 text-primary" : "hover:bg-base-200"}
               `}
-              onClick={() => switchSession(s.id)}
+              onClick={() => renamingId !== s.id && switchSession(s.id)}
             >
-              <span className="flex-1 truncate text-sm">{s.name}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deleteChat(s.id);
-                }}
-                className="opacity-0 group-hover:opacity-100 btn btn-ghost btn-xs text-error"
-              >
-                ✕
-              </button>
+              {renamingId === s.id ? (
+                <input
+                  ref={renameInputRef}
+                  value={renameText}
+                  onChange={(e) => setRenameText(e.target.value)}
+                  onBlur={submitRename}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitRename();
+                    if (e.key === "Escape") setRenamingId(null);
+                  }}
+                  className="input input-xs input-bordered flex-1 text-sm"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span className="flex-1 truncate text-sm">{s.name}</span>
+              )}
+              <div className="flex gap-0.5 opacity-0 group-hover:opacity-100">
+                {renamingId !== s.id && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startRename(s);
+                    }}
+                    className="btn btn-ghost btn-xs"
+                    title="Rename"
+                  >
+                    ✎
+                  </button>
+                )}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteChat(s.id);
+                  }}
+                  className="btn btn-ghost btn-xs text-error"
+                  title="Delete"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -277,7 +339,13 @@ export default function ChatPage() {
           >
             ☰
           </button>
-          <h2 className="font-medium truncate flex-1">{session?.name || "Chat"}</h2>
+          <h2
+            className="font-medium truncate flex-1 cursor-pointer hover:text-primary transition-colors"
+            onClick={() => session && startRename(session)}
+            title="Click to rename"
+          >
+            {session?.name || "Chat"}
+          </h2>
         </div>
 
         {/* Messages */}
@@ -344,6 +412,37 @@ export default function ChatPage() {
           </p>
         </div>
       </div>
+
+      {/* Rename modal (for header click rename) */}
+      {renamingId === session?.id && !showSidebar && (
+        <dialog className="modal modal-open">
+          <div className="modal-box max-w-sm">
+            <h3 className="font-bold text-lg mb-4">Rename Chat</h3>
+            <input
+              autoFocus
+              value={renameText}
+              onChange={(e) => setRenameText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitRename();
+                if (e.key === "Escape") setRenamingId(null);
+              }}
+              className="input input-bordered w-full"
+              placeholder="Chat name"
+            />
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setRenamingId(null)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={submitRename}>
+                Save
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setRenamingId(null)}>close</button>
+          </form>
+        </dialog>
+      )}
     </div>
   );
 }
