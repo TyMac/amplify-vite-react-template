@@ -72,7 +72,7 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionList, setSessionList] = useState<ChatSession[]>([]);
-  const [showSidebar, setShowSidebar] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -82,6 +82,11 @@ export default function ChatPage() {
   const renameInputRef = useRef<HTMLInputElement>(null);
 
   // Load session
+  // Load session list on mount
+  useEffect(() => {
+    loadSessionList();
+  }, []);
+
   useEffect(() => {
     loadSession();
   }, [sessionId]);
