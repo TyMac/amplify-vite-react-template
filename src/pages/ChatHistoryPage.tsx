@@ -17,10 +17,16 @@ function ChatHistoryPage() {
   const [sessions, setSessions] = useState<
     Array<Schema["ChatSession"]["type"]>
   >([]);
-  const [selectedSession, setSelectedSession] =
-    useState<Schema["ChatSession"]["type"] | null>(null);
+  const [selectedSession, setSelectedSession] = useState<
+    Schema["ChatSession"]["type"] | null
+  >(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
+    // Only use observeQuery when not actively searching
+    if (searchQuery.trim() !== "") return;
+
     const subscription = client.models.ChatSession.observeQuery().subscribe({
       next: (data) => {
         const sorted = [...data.items].sort((a, b) => {
@@ -32,7 +38,46 @@ function ChatHistoryPage() {
       },
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [searchQuery]);
+
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    if (searchQuery.trim() === "") {
+      // The useEffect will handle resetting the list when searchQuery is empty
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const { data, errors } = await client.queries.searchChats({
+        content: searchQuery,
+      });
+
+      if (errors) {
+        console.error("Error searching chats:", errors);
+      } else if (data) {
+        // The types returned from the custom query might need a little coercion
+        // depending on exactly how the AppSync resolver returns them
+        const searchResults = (
+          data as unknown as Schema["ChatSession"]["type"][]
+        ).map((item) => ({
+          ...item,
+          // Ensure messages is parsed or left as JSON string depending on how it comes back
+          messages:
+            typeof item.messages === "string"
+              ? item.messages
+              : JSON.stringify(item.messages),
+        }));
+
+        setSessions(searchResults);
+      }
+    } catch (error) {
+      console.error("Failed to search chats:", error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return "";
@@ -40,7 +85,7 @@ function ChatHistoryPage() {
   };
 
   const getMessages = (
-    session: Schema["ChatSession"]["type"]
+    session: Schema["ChatSession"]["type"],
   ): ChatMessage[] => {
     try {
       if (typeof session.messages === "string") {
@@ -114,6 +159,33 @@ function ChatHistoryPage() {
       <h1 className="text-2xl font-light tracking-wide text-base-content mb-6">
         Chat History
       </h1>
+
+      <form onSubmit={handleSearch} className="mb-6 flex gap-2">
+        <input
+          type="text"
+          placeholder="Search chats by name or message..."
+          className="input input-bordered w-full"
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            if (e.target.value === "") {
+              // Trigger reset via useEffect
+              setSearchQuery("");
+            }
+          }}
+        />
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={isSearching}
+        >
+          {isSearching ? (
+            <span className="loading loading-spinner loading-sm"></span>
+          ) : (
+            "Search"
+          )}
+        </button>
+      </form>
 
       {sessions.length === 0 ? (
         <div className="card bg-base-100">
