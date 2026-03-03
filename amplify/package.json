@@ -1,3 +1,9 @@
 {
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/yaml": "^1.9.6"
+  }
 }
