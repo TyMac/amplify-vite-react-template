@@ -233,10 +233,10 @@ const dataAccessPolicy = new oss.CfnAccessPolicy(
           openSearchIntegrationPipelineRole.roleArn,
           httpDataSourceRoleArn,
           // Grant permissions to account root which delegates to IAM policies
-          // This covers the deployment role as long as it has AdministratorAccess
           `arn:aws:iam::${openSearchStack.account}:root`,
-          // Explicitly add the Amplify Backend Deployment Role if it exists
-          `arn:aws:iam::${openSearchStack.account}:role/AmplifyBackendDeployRole`,
+          // Add standard CDK execution roles used by Amplify Gen 2 deployments
+          `arn:aws:iam::${openSearchStack.account}:role/cdk-hnb659fds-cfn-exec-role-${openSearchStack.account}-${region}`,
+          `arn:aws:iam::${openSearchStack.account}:role/cdk-hnb659fds-deploy-role-${openSearchStack.account}-${region}`,
         ],
       },
     ]),
