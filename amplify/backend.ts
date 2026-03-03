@@ -232,9 +232,9 @@ const dataAccessPolicy = new oss.CfnAccessPolicy(
         Principal: [
           openSearchIntegrationPipelineRole.roleArn,
           httpDataSourceRoleArn,
-          // Grant permissions to account root and Admin role for deployment management
+          // Grant permissions to account root which delegates to IAM policies
+          // This covers the deployment role as long as it has AdministratorAccess
           `arn:aws:iam::${openSearchStack.account}:root`,
-          `arn:aws:iam::${openSearchStack.account}:role/Admin`,
         ],
       },
     ]),
