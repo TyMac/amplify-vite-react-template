@@ -75,6 +75,7 @@ export default function ChatPage() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -230,6 +231,12 @@ export default function ChatPage() {
     }
   }
 
+  function copyMessage(msg: ChatMessage) {
+    navigator.clipboard.writeText(msg.content);
+    setCopiedId(msg.id);
+    setTimeout(() => setCopiedId(null), 1500);
+  }
+
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -356,21 +363,45 @@ export default function ChatPage() {
                 key={msg.id}
                 className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                <div
-                  className={`
-                    max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed
-                    ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-content rounded-br-sm"
-                        : "bg-base-200 text-base-content rounded-bl-sm"
-                    }
-                  `}
-                >
-                  {msg.role === "assistant" ? (
-                    <FormattedMessage content={msg.content} />
-                  ) : (
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                  )}
+                <div className="relative group max-w-[85%]">
+                  <div
+                    className={`
+                      rounded-2xl px-4 py-3 text-sm leading-relaxed
+                      ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-content rounded-br-sm"
+                          : "bg-base-200 text-base-content rounded-bl-sm"
+                      }
+                    `}
+                  >
+                    {msg.role === "assistant" ? (
+                      <FormattedMessage content={msg.content} />
+                    ) : (
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => copyMessage(msg)}
+                    className={`
+                      absolute top-1 right-1
+                      opacity-0 group-hover:opacity-100
+                      transition-opacity
+                      btn btn-ghost btn-xs btn-circle
+                      ${msg.role === "user" ? "text-primary-content/60 hover:text-primary-content" : "text-base-content/40 hover:text-base-content"}
+                    `}
+                    title="Copy"
+                  >
+                    {copiedId === msg.id ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                        <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                        <path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12A1.5 1.5 0 0 1 17 6.622V12.5a1.5 1.5 0 0 1-1.5 1.5h-1v-3.379a3 3 0 0 0-.879-2.121L10.5 5.379A3 3 0 0 0 8.379 4.5H7v-1Z" />
+                        <path d="M4.5 6A1.5 1.5 0 0 0 3 7.5v9A1.5 1.5 0 0 0 4.5 18h7a1.5 1.5 0 0 0 1.5-1.5v-5.879a1.5 1.5 0 0 0-.44-1.06L9.44 6.439A1.5 1.5 0 0 0 8.378 6H4.5Z" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
               </div>
             ))}
