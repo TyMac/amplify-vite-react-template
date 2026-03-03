@@ -235,6 +235,8 @@ const dataAccessPolicy = new oss.CfnAccessPolicy(
           // Grant permissions to account root which delegates to IAM policies
           // This covers the deployment role as long as it has AdministratorAccess
           `arn:aws:iam::${openSearchStack.account}:root`,
+          // Explicitly add the Amplify Backend Deployment Role if it exists
+          `arn:aws:iam::${openSearchStack.account}:role/AmplifyBackendDeployRole`,
         ],
       },
     ]),
