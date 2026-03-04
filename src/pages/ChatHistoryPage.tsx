@@ -11,6 +11,7 @@ function ChatHistoryPage() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -64,6 +65,14 @@ function ChatHistoryPage() {
     }
     setRenamingId(null);
   }
+
+  const filteredSessions = searchQuery.trim()
+    ? sessions.filter((s) => {
+        const q = searchQuery.toLowerCase();
+        if (s.name.toLowerCase().includes(q)) return true;
+        return s.messages.some((m) => m.content.toLowerCase().includes(q));
+      })
+    : sessions;
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return "";
@@ -154,27 +163,50 @@ function ChatHistoryPage() {
         </button>
       </div>
 
+      <div className="mb-6 flex gap-2">
+        <input
+          type="text"
+          placeholder="Search chats by name or message..."
+          className="input input-bordered w-full"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+        {searchQuery && (
+          <button
+            className="btn btn-ghost"
+            onClick={() => setSearchQuery("")}
+            title="Clear search"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <div className="flex justify-center py-12">
           <span className="loading loading-spinner loading-md text-primary"></span>
         </div>
-      ) : sessions.length === 0 ? (
+      ) : filteredSessions.length === 0 ? (
         <div className="card bg-base-100">
           <div className="card-body items-center text-center py-12">
             <p className="text-base-content/50 font-light">
-              No chat history yet. Start a conversation!
+              {searchQuery.trim()
+                ? `No chats matching "${searchQuery}".`
+                : "No chat history yet. Start a conversation!"}
             </p>
-            <button
-              onClick={() => navigate("/chat")}
-              className="btn btn-primary btn-sm mt-4"
-            >
-              Start Chat
-            </button>
+            {!searchQuery.trim() && (
+              <button
+                onClick={() => navigate("/chat")}
+                className="btn btn-primary btn-sm mt-4"
+              >
+                Start Chat
+              </button>
+            )}
           </div>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {sessions.map((session) => {
+          {filteredSessions.map((session) => {
             const lastMessage = session.messages[session.messages.length - 1];
             return (
               <div
