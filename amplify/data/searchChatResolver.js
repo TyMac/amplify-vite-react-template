@@ -31,7 +31,7 @@ export function request(ctx) {
             filter: [
               {
                 term: {
-                  owner: userId,
+                  "owner.keyword": userId,
                 },
               },
             ],
