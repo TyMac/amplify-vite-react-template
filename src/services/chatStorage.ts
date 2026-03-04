@@ -20,6 +20,7 @@ export interface ChatSession {
   id: string;
   name: string;
   messages: ChatMessage[];
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -47,6 +48,7 @@ export const chatStorage = {
         id: s.id,
         name: s.name,
         messages: parseMessages(s.messages),
+        tags: (s.tags as string[] | null | undefined) ?? [],
         createdAt: s.createdAt || new Date().toISOString(),
         updatedAt: s.updatedAt || new Date().toISOString(),
       }))
@@ -64,6 +66,7 @@ export const chatStorage = {
       id: data.id,
       name: data.name,
       messages: parseMessages(data.messages),
+      tags: (data.tags as string[] | null | undefined) ?? [],
       createdAt: data.createdAt || new Date().toISOString(),
       updatedAt: data.updatedAt || new Date().toISOString(),
     };
@@ -89,6 +92,7 @@ export const chatStorage = {
       userId,
       name: sessionName,
       messages: JSON.stringify([welcomeMessage]),
+      tags: [],
       createdAt: now,
       updatedAt: now,
     });
@@ -99,6 +103,7 @@ export const chatStorage = {
       id: data.id,
       name: data.name,
       messages: [welcomeMessage],
+      tags: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -116,6 +121,14 @@ export const chatStorage = {
     await client.models.ChatSession.update({
       id: sessionId,
       messages: JSON.stringify(updatedMessages),
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  async updateTags(id: string, tags: string[]): Promise<void> {
+    await client.models.ChatSession.update({
+      id,
+      tags,
       updatedAt: new Date().toISOString(),
     });
   },

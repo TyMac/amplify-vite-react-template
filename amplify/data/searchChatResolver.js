@@ -7,6 +7,22 @@ export function request(ctx) {
   }
 
   const userId = `${ctx.identity.sub}::${ctx.identity.username}`;
+  const { content, tags } = ctx.args;
+
+  // Base owner filter — always applied
+  const filters = [{ term: { "owner.keyword": userId } }];
+
+  // Optional tag filter — requires ALL provided tags to be present
+  if (tags && tags.length > 0) {
+    tags.forEach((tag) => {
+      filters.push({ term: { "tags.keyword": tag } });
+    });
+  }
+
+  // Build must clause — full-text search only when content is provided
+  const must = content && content.trim() !== ""
+    ? [{ multi_match: { query: content, fields: ["name", "messages"] } }]
+    : [{ match_all: {} }];
 
   return {
     version: "2018-05-29",
@@ -20,23 +36,11 @@ export function request(ctx) {
         size: 50,
         query: {
           bool: {
-            must: [
-              {
-                multi_match: {
-                  query: ctx.args.content,
-                  fields: ["name", "messages"],
-                },
-              },
-            ],
-            filter: [
-              {
-                term: {
-                  "owner.keyword": userId,
-                },
-              },
-            ],
+            must,
+            filter: filters,
           },
         },
+        sort: [{ "updatedAt.keyword": { order: "desc" } }],
       },
     },
     resourcePath: `/chatsession/_search`,

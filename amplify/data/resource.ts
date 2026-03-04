@@ -207,6 +207,7 @@ const schema = a.schema({
       deviceId: a.string(), // for anonymous tracking
       name: a.string().required(),
       messages: a.json().required(), // Array of {id, role, content, timestamp}
+      tags: a.string().array(), // User-defined tags e.g. ["gesha", "Ethiopia"]
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
     })
@@ -269,6 +270,7 @@ const schema = a.schema({
     .query()
     .arguments({
       content: a.string(),
+      tags: a.string().array(),
     })
     .returns(a.ref("ChatSession").array())
     .authorization((allow) => [allow.authenticated()])

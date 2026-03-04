@@ -8,8 +8,17 @@ import {
   type ChatSession,
 } from "../services/chatStorage";
 
-// Separate client scoped to userPool auth for the searchChats query
 const searchClient = generateClient<Schema>({ authMode: "userPool" });
+
+// Suggested tags grouped by category
+const TAG_SUGGESTIONS = {
+  Varietals: ["Gesha", "Pink Bourbon", "Bourbon", "Typica", "Caturra", "SL28", "Pacamara", "Castillo"],
+  Origins: ["Ethiopia", "Colombia", "Panama", "Kenya", "Guatemala", "Costa Rica", "Peru", "Brazil", "Yemen", "Honduras"],
+  Process: ["Washed", "Natural", "Honey", "Anaerobic"],
+  Roast: ["Light", "Medium", "Dark"],
+};
+
+const ALL_SUGGESTIONS = Object.values(TAG_SUGGESTIONS).flat();
 
 function parseMessages(raw: unknown): ChatMessage[] {
   try {
@@ -21,12 +30,165 @@ function parseMessages(raw: unknown): ChatMessage[] {
   }
 }
 
+function TagChip({
+  tag,
+  onRemove,
+  onClick,
+  active,
+  size = "sm",
+}: {
+  tag: string;
+  onRemove?: () => void;
+  onClick?: () => void;
+  active?: boolean;
+  size?: "xs" | "sm";
+}) {
+  return (
+    <span
+      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
+      className={`badge gap-1 cursor-pointer select-none transition-colors ${
+        size === "xs" ? "badge-xs" : "badge-sm"
+      } ${
+        active
+          ? "badge-primary"
+          : "badge-ghost border border-base-300 hover:badge-primary hover:text-primary-content"
+      }`}
+    >
+      {tag}
+      {onRemove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="ml-0.5 opacity-60 hover:opacity-100 text-xs leading-none"
+        >
+          ×
+        </button>
+      )}
+    </span>
+  );
+}
+
+function TagEditor({
+  tags,
+  onChange,
+}: {
+  tags: string[];
+  onChange: (tags: string[]) => void;
+}) {
+  const [input, setInput] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const filtered = input.trim()
+    ? ALL_SUGGESTIONS.filter(
+        (s) =>
+          s.toLowerCase().includes(input.toLowerCase()) &&
+          !tags.includes(s)
+      )
+    : [];
+
+  function addTag(tag: string) {
+    const trimmed = tag.trim();
+    if (!trimmed || tags.includes(trimmed)) return;
+    onChange([...tags, trimmed]);
+    setInput("");
+    setShowSuggestions(false);
+  }
+
+  function removeTag(tag: string) {
+    onChange(tags.filter((t) => t !== tag));
+  }
+
+  return (
+    <div className="relative">
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {tags.map((tag) => (
+          <TagChip key={tag} tag={tag} onRemove={() => removeTag(tag)} />
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          className="input input-sm input-bordered flex-1"
+          placeholder="Add tag (e.g. Gesha, Ethiopia)..."
+          value={input}
+          onChange={(e) => {
+            setInput(e.target.value);
+            setShowSuggestions(true);
+          }}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addTag(input);
+            }
+          }}
+        />
+        <button
+          className="btn btn-sm btn-primary"
+          disabled={!input.trim()}
+          onClick={() => addTag(input)}
+        >
+          Add
+        </button>
+      </div>
+
+      {/* Suggestions dropdown */}
+      {showSuggestions && (filtered.length > 0 || (!input.trim())) && (
+        <div className="absolute z-20 mt-1 w-full bg-base-100 border border-base-300 rounded-box shadow-lg max-h-48 overflow-y-auto">
+          {!input.trim() &&
+            Object.entries(TAG_SUGGESTIONS).map(([category, suggestions]) => {
+              const available = suggestions.filter((s) => !tags.includes(s));
+              if (!available.length) return null;
+              return (
+                <div key={category} className="px-3 py-2">
+                  <div className="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-1">
+                    {category}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {available.map((s) => (
+                      <TagChip
+                        key={s}
+                        tag={s}
+                        onClick={() => addTag(s)}
+                        size="xs"
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          {input.trim() &&
+            filtered.map((s) => (
+              <div
+                key={s}
+                className="px-3 py-2 hover:bg-base-200 cursor-pointer text-sm"
+                onMouseDown={() => addTag(s)}
+              >
+                {s}
+              </div>
+            ))}
+          {input.trim() && !filtered.length && (
+            <div className="px-3 py-2 text-sm text-base-content/50">
+              Press Enter to add "{input.trim()}"
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ChatHistoryPage() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activeTags, setActiveTags] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -56,13 +218,11 @@ function ChatHistoryPage() {
     }
   }
 
-  async function handleSearch(e?: React.FormEvent) {
-    if (e) e.preventDefault();
+  async function runSearch(query: string, tags: string[]) {
+    const hasQuery = query.trim() !== "";
+    const hasTags = tags.length > 0;
 
-    const q = searchQuery.trim();
-
-    // Clear search — reload all sessions from DynamoDB
-    if (!q) {
+    if (!hasQuery && !hasTags) {
       setIsSearchActive(false);
       await loadSessions();
       return;
@@ -71,7 +231,8 @@ function ChatHistoryPage() {
     setIsSearching(true);
     try {
       const { data, errors } = await searchClient.queries.searchChats({
-        content: q,
+        content: hasQuery ? query : undefined,
+        tags: hasTags ? tags : undefined,
       });
 
       if (errors) {
@@ -84,6 +245,7 @@ function ChatHistoryPage() {
           id: item.id,
           name: item.name,
           messages: parseMessages(item.messages),
+          tags: (item.tags as string[] | null | undefined) ?? [],
           createdAt: item.createdAt || new Date().toISOString(),
           updatedAt: item.updatedAt || new Date().toISOString(),
         })
@@ -98,8 +260,22 @@ function ChatHistoryPage() {
     }
   }
 
+  async function handleSearch(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    await runSearch(searchQuery, activeTags);
+  }
+
+  async function toggleTagFilter(tag: string) {
+    const next = activeTags.includes(tag)
+      ? activeTags.filter((t) => t !== tag)
+      : [...activeTags, tag];
+    setActiveTags(next);
+    await runSearch(searchQuery, next);
+  }
+
   async function clearSearch() {
     setSearchQuery("");
+    setActiveTags([]);
     setIsSearchActive(false);
     await loadSessions();
   }
@@ -109,10 +285,19 @@ function ChatHistoryPage() {
     await chatStorage.deleteSession(id);
     if (selectedSession?.id === id) setSelectedSession(null);
     if (isSearchActive) {
-      // Re-run the search to refresh results
-      await handleSearch();
+      await runSearch(searchQuery, activeTags);
     } else {
       await loadSessions();
+    }
+  }
+
+  async function handleTagsChange(sessionId: string, tags: string[]) {
+    await chatStorage.updateTags(sessionId, tags);
+    setSessions((prev) =>
+      prev.map((s) => (s.id === sessionId ? { ...s, tags } : s))
+    );
+    if (selectedSession?.id === sessionId) {
+      setSelectedSession((prev) => prev ? { ...prev, tags } : prev);
     }
   }
 
@@ -131,10 +316,15 @@ function ChatHistoryPage() {
       prev.map((s) => (s.id === renamingId ? { ...s, name: renameText.trim() } : s))
     );
     if (selectedSession?.id === renamingId) {
-      setSelectedSession({ ...selectedSession, name: renameText.trim() });
+      setSelectedSession((prev) => prev ? { ...prev, name: renameText.trim() } : prev);
     }
     setRenamingId(null);
   }
+
+  // Collect all tags across loaded sessions for the filter bar
+  const allTagsInUse = Array.from(
+    new Set(sessions.flatMap((s) => s.tags))
+  ).sort();
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return "";
@@ -178,6 +368,15 @@ function ChatHistoryPage() {
                   Continue →
                 </button>
               </div>
+            </div>
+
+            {/* Tag editor */}
+            <div className="mb-4 pb-4 border-b border-base-200">
+              <p className="text-xs text-base-content/40 uppercase tracking-wider mb-2">Tags</p>
+              <TagEditor
+                tags={selectedSession.tags}
+                onChange={(tags) => handleTagsChange(selectedSession.id, tags)}
+              />
             </div>
 
             <div className="flex flex-col gap-3">
@@ -225,8 +424,8 @@ function ChatHistoryPage() {
         </button>
       </div>
 
-      {/* OpenSearch-powered search form */}
-      <form onSubmit={handleSearch} className="mb-6 flex gap-2">
+      {/* Search form */}
+      <form onSubmit={handleSearch} className="mb-3 flex gap-2">
         <input
           type="text"
           placeholder="Search chats by name or message..."
@@ -247,7 +446,7 @@ function ChatHistoryPage() {
           <button
             type="submit"
             className="btn btn-primary"
-            disabled={isSearching || !searchQuery.trim()}
+            disabled={isSearching || (!searchQuery.trim() && !activeTags.length)}
           >
             {isSearching ? (
               <span className="loading loading-spinner loading-sm"></span>
@@ -258,9 +457,28 @@ function ChatHistoryPage() {
         )}
       </form>
 
+      {/* Tag filter bar */}
+      {allTagsInUse.length > 0 && (
+        <div className="mb-5 flex flex-wrap gap-1.5 items-center">
+          <span className="text-xs text-base-content/40 mr-1">Filter:</span>
+          {allTagsInUse.map((tag) => (
+            <TagChip
+              key={tag}
+              tag={tag}
+              active={activeTags.includes(tag)}
+              onClick={() => toggleTagFilter(tag)}
+            />
+          ))}
+        </div>
+      )}
+
       {isSearchActive && (
         <p className="text-xs text-base-content/40 mb-3">
-          Showing OpenSearch results for "{searchQuery}"
+          {searchQuery.trim() && activeTags.length > 0
+            ? `OpenSearch results for "${searchQuery}" tagged [${activeTags.join(", ")}]`
+            : searchQuery.trim()
+            ? `OpenSearch results for "${searchQuery}"`
+            : `Filtered by tag${activeTags.length > 1 ? "s" : ""}: [${activeTags.join(", ")}]`}
         </p>
       )}
 
@@ -273,7 +491,7 @@ function ChatHistoryPage() {
           <div className="card-body items-center text-center py-12">
             <p className="text-base-content/50 font-light">
               {isSearchActive
-                ? `No chats found for "${searchQuery}".`
+                ? "No chats matched your search."
                 : "No chat history yet. Start a conversation!"}
             </p>
             {!isSearchActive && (
@@ -321,6 +539,20 @@ function ChatHistoryPage() {
                         <p className="text-sm text-base-content/50 truncate mt-1">
                           {lastMessage.content}
                         </p>
+                      )}
+                      {/* Tags on card */}
+                      {session.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {session.tags.map((tag) => (
+                            <TagChip
+                              key={tag}
+                              tag={tag}
+                              size="xs"
+                              active={activeTags.includes(tag)}
+                              onClick={() => toggleTagFilter(tag)}
+                            />
+                          ))}
+                        </div>
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
