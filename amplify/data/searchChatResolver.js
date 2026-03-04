@@ -1,25 +1,23 @@
 import { util } from "@aws-appsync/utils";
 
 export function request(ctx) {
-  // Require authentication to search
   if (!ctx.identity || !ctx.identity.sub) {
     util.unauthorized();
   }
 
-  const userId = `${ctx.identity.sub}::${ctx.identity.username}`;
-  const { content, tags } = ctx.args;
+  const userId = ctx.identity.sub + "::" + ctx.identity.username;
+  const content = ctx.args.content;
+  const tags = ctx.args.tags;
 
-  // Base owner filter — always applied
-  const filters = [{ term: { "owner.keyword": userId } }];
+  // Build tag filters (one term per tag = AND logic)
+  const tagFilters = tags && tags.length > 0
+    ? tags.map(function (tag) { return { term: { "tags.keyword": tag } }; })
+    : [];
 
-  // Optional tag filter — requires ALL provided tags to be present
-  if (tags && tags.length > 0) {
-    tags.forEach((tag) => {
-      filters.push({ term: { "tags.keyword": tag } });
-    });
-  }
+  // Owner filter always applied; concat tag filters
+  const filter = [{ term: { "owner.keyword": userId } }].concat(tagFilters);
 
-  // Build must clause — full-text search only when content is provided
+  // Full-text must clause — match_all when no text query
   const must = content && content.trim() !== ""
     ? [{ multi_match: { query: content, fields: ["name", "messages"] } }]
     : [{ match_all: {} }];
@@ -36,25 +34,19 @@ export function request(ctx) {
         size: 50,
         query: {
           bool: {
-            must,
-            filter: filters,
+            must: must,
+            filter: filter,
           },
         },
-        sort: [{ "updatedAt.keyword": { order: "desc" } }],
       },
     },
-    resourcePath: `/chatsession/_search`,
+    resourcePath: "/chatsession/_search",
   };
 }
 
-/**
- * Returns the fetched items
- * @param {import('@aws-appsync/utils').Context} ctx the context
- * @returns {*} the result
- */
 export function response(ctx) {
   const { statusCode, body } = ctx.result;
   if (statusCode === 200) {
-    return JSON.parse(body).hits.hits.map((hit) => hit._source);
+    return JSON.parse(body).hits.hits.map(function (hit) { return hit._source; });
   }
 }
