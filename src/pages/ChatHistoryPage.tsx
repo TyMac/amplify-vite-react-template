@@ -1,10 +1,25 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
 import {
   chatStorage,
   type ChatMessage,
   type ChatSession,
 } from "../services/chatStorage";
+
+// Separate client scoped to userPool auth for the searchChats query
+const searchClient = generateClient<Schema>({ authMode: "userPool" });
+
+function parseMessages(raw: unknown): ChatMessage[] {
+  try {
+    if (typeof raw === "string") return JSON.parse(raw);
+    if (Array.isArray(raw)) return raw as ChatMessage[];
+    return [];
+  } catch {
+    return [];
+  }
+}
 
 function ChatHistoryPage() {
   const navigate = useNavigate();
@@ -12,6 +27,8 @@ function ChatHistoryPage() {
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -39,11 +56,64 @@ function ChatHistoryPage() {
     }
   }
 
+  async function handleSearch(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+
+    const q = searchQuery.trim();
+
+    // Clear search — reload all sessions from DynamoDB
+    if (!q) {
+      setIsSearchActive(false);
+      await loadSessions();
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const { data, errors } = await searchClient.queries.searchChats({
+        content: q,
+      });
+
+      if (errors) {
+        console.error("OpenSearch error:", errors);
+        return;
+      }
+
+      const results = ((data ?? []) as unknown as Schema["ChatSession"]["type"][]).map(
+        (item) => ({
+          id: item.id,
+          name: item.name,
+          messages: parseMessages(item.messages),
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+        })
+      );
+
+      setSessions(results);
+      setIsSearchActive(true);
+    } catch (err) {
+      console.error("Failed to search chats:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  }
+
+  async function clearSearch() {
+    setSearchQuery("");
+    setIsSearchActive(false);
+    await loadSessions();
+  }
+
   async function deleteSession(id: string) {
     if (!confirm("Delete this conversation?")) return;
     await chatStorage.deleteSession(id);
     if (selectedSession?.id === id) setSelectedSession(null);
-    await loadSessions();
+    if (isSearchActive) {
+      // Re-run the search to refresh results
+      await handleSearch();
+    } else {
+      await loadSessions();
+    }
   }
 
   function startRename(s: ChatSession) {
@@ -65,14 +135,6 @@ function ChatHistoryPage() {
     }
     setRenamingId(null);
   }
-
-  const filteredSessions = searchQuery.trim()
-    ? sessions.filter((s) => {
-        const q = searchQuery.toLowerCase();
-        if (s.name.toLowerCase().includes(q)) return true;
-        return s.messages.some((m) => m.content.toLowerCase().includes(q));
-      })
-    : sessions;
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return "";
@@ -163,7 +225,8 @@ function ChatHistoryPage() {
         </button>
       </div>
 
-      <div className="mb-6 flex gap-2">
+      {/* OpenSearch-powered search form */}
+      <form onSubmit={handleSearch} className="mb-6 flex gap-2">
         <input
           type="text"
           placeholder="Search chats by name or message..."
@@ -171,30 +234,49 @@ function ChatHistoryPage() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
-        {searchQuery && (
+        {isSearchActive ? (
           <button
+            type="button"
             className="btn btn-ghost"
-            onClick={() => setSearchQuery("")}
+            onClick={clearSearch}
             title="Clear search"
           >
             ✕
           </button>
+        ) : (
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={isSearching || !searchQuery.trim()}
+          >
+            {isSearching ? (
+              <span className="loading loading-spinner loading-sm"></span>
+            ) : (
+              "Search"
+            )}
+          </button>
         )}
-      </div>
+      </form>
 
-      {loading ? (
+      {isSearchActive && (
+        <p className="text-xs text-base-content/40 mb-3">
+          Showing OpenSearch results for "{searchQuery}"
+        </p>
+      )}
+
+      {loading || isSearching ? (
         <div className="flex justify-center py-12">
           <span className="loading loading-spinner loading-md text-primary"></span>
         </div>
-      ) : filteredSessions.length === 0 ? (
+      ) : sessions.length === 0 ? (
         <div className="card bg-base-100">
           <div className="card-body items-center text-center py-12">
             <p className="text-base-content/50 font-light">
-              {searchQuery.trim()
-                ? `No chats matching "${searchQuery}".`
+              {isSearchActive
+                ? `No chats found for "${searchQuery}".`
                 : "No chat history yet. Start a conversation!"}
             </p>
-            {!searchQuery.trim() && (
+            {!isSearchActive && (
               <button
                 onClick={() => navigate("/chat")}
                 className="btn btn-primary btn-sm mt-4"
@@ -206,7 +288,7 @@ function ChatHistoryPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {filteredSessions.map((session) => {
+          {sessions.map((session) => {
             const lastMessage = session.messages[session.messages.length - 1];
             return (
               <div
