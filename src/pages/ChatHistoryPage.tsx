@@ -10,6 +10,27 @@ import {
 
 const searchClient = generateClient<Schema>({ authMode: "userPool" });
 
+// Color palette for tags — assigned deterministically by tag name hash
+const TAG_PALETTE = [
+  "bg-amber-600",
+  "bg-rose-600",
+  "bg-violet-600",
+  "bg-teal-600",
+  "bg-pink-600",
+  "bg-indigo-500",
+  "bg-cyan-600",
+  "bg-emerald-600",
+  "bg-orange-500",
+  "bg-purple-600",
+  "bg-sky-600",
+  "bg-lime-600",
+];
+
+function getTagColor(tag: string): string {
+  const hash = tag.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return TAG_PALETTE[hash % TAG_PALETTE.length];
+}
+
 // Suggested tags grouped by category
 const TAG_SUGGESTIONS = {
   Varietals: ["Gesha", "Pink Bourbon", "Bourbon", "Typica", "Caturra", "SL28", "Pacamara", "Castillo"],
@@ -43,16 +64,20 @@ function TagChip({
   active?: boolean;
   size?: "xs" | "sm";
 }) {
+  const color = getTagColor(tag);
+  const sizeClass = size === "xs" ? "px-2 py-0.5 text-xs" : "px-2.5 py-1 text-xs";
+
   return (
     <span
       onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-      className={`badge gap-1 cursor-pointer select-none transition-colors ${
-        size === "xs" ? "badge-xs" : "badge-sm"
-      } ${
-        active
-          ? "badge-primary"
-          : "badge-ghost border border-base-300 hover:badge-primary hover:text-primary-content"
-      }`}
+      className={[
+        "inline-flex items-center gap-1 rounded-full font-medium select-none transition-all",
+        "border border-white/30 text-white",
+        color,
+        sizeClass,
+        onClick ? "cursor-pointer hover:brightness-110 hover:border-white/60" : "",
+        active ? "ring-2 ring-white/70 brightness-110" : "opacity-90",
+      ].join(" ")}
     >
       {tag}
       {onRemove && (
@@ -61,7 +86,7 @@ function TagChip({
             e.stopPropagation();
             onRemove();
           }}
-          className="ml-0.5 opacity-60 hover:opacity-100 text-xs leading-none"
+          className="opacity-70 hover:opacity-100 leading-none text-sm"
         >
           ×
         </button>
