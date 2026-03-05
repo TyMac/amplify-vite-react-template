@@ -374,7 +374,7 @@ function ChatHistoryPage() {
             <div className="mb-4 pb-4 border-b border-base-200">
               <p className="text-xs text-base-content/40 uppercase tracking-wider mb-2">Tags</p>
               <TagEditor
-                tags={selectedSession.tags}
+                tags={selectedSession.tags ?? []}
                 onChange={(tags) => handleTagsChange(selectedSession.id, tags)}
               />
             </div>
@@ -405,6 +405,37 @@ function ChatHistoryPage() {
             </div>
           </div>
         </div>
+
+        {/* Rename modal — must live inside the detail view return */}
+        {renamingId && (
+          <dialog className="modal modal-open">
+            <div className="modal-box max-w-sm">
+              <h3 className="font-bold text-lg mb-4">Rename Chat</h3>
+              <input
+                autoFocus
+                value={renameText}
+                onChange={(e) => setRenameText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitRename();
+                  if (e.key === "Escape") setRenamingId(null);
+                }}
+                className="input input-bordered w-full"
+                placeholder="Chat name"
+              />
+              <div className="modal-action">
+                <button className="btn btn-ghost" onClick={() => setRenamingId(null)}>
+                  Cancel
+                </button>
+                <button className="btn btn-primary" onClick={submitRename}>
+                  Save
+                </button>
+              </div>
+            </div>
+            <form method="dialog" className="modal-backdrop">
+              <button onClick={() => setRenamingId(null)}>close</button>
+            </form>
+          </dialog>
+        )}
       </div>
     );
   }
