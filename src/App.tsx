@@ -12,13 +12,13 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
 
   return (
     <div className="navbar bg-base-100 border-b border-base-200 px-4 sticky top-0 z-50">
-      <div className="flex-1 gap-2">
+      <div className="flex-1">
         <Link to="/" className="flex items-center gap-2 text-primary font-light text-xl tracking-widest">
           <span className="text-2xl">☕</span>
           AI Barista
         </Link>
       </div>
-      <div className="flex-none gap-2">
+      <div className="flex-none">
         <nav className="flex items-center gap-1">
           <Link
             to="/"
@@ -39,6 +39,8 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
             History
           </Link>
         </nav>
+      </div>
+      <div className="flex-1 flex justify-end gap-2">
         <ThemeToggle />
         {user && (
           <div className="dropdown dropdown-end">
