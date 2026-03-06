@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { getUrl } from "aws-amplify/storage";
 import {
   chatStorage,
   type ChatMessage,
   type ChatSession,
 } from "../services/chatStorage";
 import { chatWithGemini } from "../services/gemini";
+import { TagChip, TagEditor } from "../components/tags";
 
 /** Render basic markdown: **bold**, bullet lines, headings */
 function FormattedMessage({ content }: { content: string }) {
@@ -69,6 +71,8 @@ export default function ChatPage() {
 
   const [session, setSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [showTagEditor, setShowTagEditor] = useState(false);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionList, setSessionList] = useState<ChatSession[]>([]);
@@ -76,6 +80,8 @@ export default function ChatPage() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Cache of resolved S3 presigned URLs: messageId → url
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -112,12 +118,36 @@ export default function ChatPage() {
     }
   }, [renamingId]);
 
+  // Resolve S3 presigned URLs for messages with imageKey
+  useEffect(() => {
+    const unresolved = messages.filter((m) => m.imageKey && !imageUrls[m.id]);
+    if (unresolved.length === 0) return;
+    (async () => {
+      const resolved: Record<string, string> = {};
+      for (const msg of unresolved) {
+        try {
+          const { url } = await getUrl({
+            path: msg.imageKey!,
+            options: { expiresIn: 3600, validateObjectExistence: false },
+          });
+          resolved[msg.id] = url.toString();
+        } catch (err) {
+          console.warn("Failed to resolve image URL for", msg.id, err);
+        }
+      }
+      if (Object.keys(resolved).length > 0) {
+        setImageUrls((prev) => ({ ...prev, ...resolved }));
+      }
+    })();
+  }, [messages]);
+
   async function loadSession() {
     if (sessionId) {
       const s = await chatStorage.getSession(sessionId);
       if (s) {
         setSession(s);
         setMessages(s.messages);
+        setTags(s.tags ?? []);
         return;
       }
     }
@@ -126,8 +156,18 @@ export default function ChatPage() {
     if (newSession) {
       setSession(newSession);
       setMessages(newSession.messages);
+      setTags(newSession.tags ?? []);
       navigate(`/chat/${newSession.id}`, { replace: true });
     }
+  }
+
+  async function handleTagsChange(newTags: string[]) {
+    if (!session) return;
+    setTags(newTags);
+    await chatStorage.updateTags(session.id, newTags);
+    setSessionList((prev) =>
+      prev.map((s) => (s.id === session.id ? { ...s, tags: newTags } : s))
+    );
   }
 
   async function loadSessionList() {
@@ -332,57 +372,108 @@ export default function ChatPage() {
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Chat header */}
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-base-200 bg-base-100">
-          <button
-            onClick={() => {
-              loadSessionList();
-              setShowSidebar(true);
-            }}
-            className="btn btn-ghost btn-sm btn-circle lg:hidden"
-          >
-            ☰
-          </button>
-          <button
-            onClick={() => {
-              loadSessionList();
-              setShowSidebar((v) => !v);
-            }}
-            className="btn btn-ghost btn-sm btn-circle hidden lg:flex"
-          >
-            ☰
-          </button>
-          <h2
-            className="font-medium truncate flex-1 cursor-pointer hover:text-primary transition-colors"
-            onClick={() => session && startRename(session)}
-            title="Click to rename"
-          >
-            {session?.name || "Chat"}
-          </h2>
+        <div className="px-4 py-2 border-b border-base-200 bg-base-100">
+          {/* Row 1: sidebar toggle + title */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                loadSessionList();
+                setShowSidebar(true);
+              }}
+              className="btn btn-ghost btn-sm btn-circle lg:hidden"
+            >
+              ☰
+            </button>
+            <button
+              onClick={() => {
+                loadSessionList();
+                setShowSidebar((v) => !v);
+              }}
+              className="btn btn-ghost btn-sm btn-circle hidden lg:flex"
+            >
+              ☰
+            </button>
+            <h2
+              className="font-medium truncate flex-1 cursor-pointer hover:text-primary transition-colors"
+              onClick={() => session && startRename(session)}
+              title="Click to rename"
+            >
+              {session?.name || "Chat"}
+            </h2>
+          </div>
+
+          {/* Row 2: tags + add button */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {tags.map((tag) => (
+              <TagChip
+                key={tag}
+                tag={tag}
+                onRemove={() => handleTagsChange(tags.filter((t) => t !== tag))}
+              />
+            ))}
+            <button
+              onClick={() => setShowTagEditor((v) => !v)}
+              className="btn btn-ghost btn-xs gap-1 text-base-content/40 hover:text-base-content"
+              title={showTagEditor ? "Close tag editor" : "Add tags"}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                <path fillRule="evenodd" d="M5.5 3A2.5 2.5 0 0 0 3 5.5v2.879a2.5 2.5 0 0 0 .732 1.767l6.5 6.5a2.5 2.5 0 0 0 3.536 0l2.878-2.878a2.5 2.5 0 0 0 0-3.536l-6.5-6.5A2.5 2.5 0 0 0 8.38 3H5.5ZM6 7a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z" clipRule="evenodd" />
+              </svg>
+              {tags.length === 0 ? "Add tags" : showTagEditor ? "Done" : "Edit"}
+            </button>
+          </div>
+
+          {/* Tag editor panel */}
+          {showTagEditor && (
+            <div className="mt-2 pb-1">
+              <TagEditor tags={tags} onChange={handleTagsChange} />
+            </div>
+          )}
         </div>
 
         {/* Messages */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6">
           <div className="max-w-2xl mx-auto flex flex-col gap-4">
-            {messages.map((msg) => (
+            {messages.map((msg) => {
+              const timeLabel = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+              const isUser = msg.role === "user";
+              return (
               <div
                 key={msg.id}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex flex-col gap-0.5 ${isUser ? "items-end" : "items-start"}`}
               >
                 <div className="relative group max-w-[85%]">
                   <div
                     className={`
                       rounded-2xl px-4 py-3 text-sm leading-relaxed
                       ${
-                        msg.role === "user"
+                        isUser
                           ? "bg-primary text-primary-content rounded-br-sm"
                           : "bg-base-200 text-base-content rounded-bl-sm"
                       }
                     `}
                   >
+                    {msg.imageKey && (
+                      imageUrls[msg.id] ? (
+                        <img
+                          src={imageUrls[msg.id]}
+                          alt="Chat attachment"
+                          className="rounded-lg mb-2 max-w-full"
+                          style={{ maxHeight: 240, objectFit: "cover" }}
+                        />
+                      ) : (
+                        <div className="rounded-lg mb-2 bg-base-300 flex items-center justify-center text-xs text-base-content/40"
+                          style={{ width: 220, height: 165 }}>
+                          Loading image...
+                        </div>
+                      )
+                    )}
                     {msg.role === "assistant" ? (
                       <FormattedMessage content={msg.content} />
                     ) : (
-                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                      !msg.imageKey || msg.content !== "📷 Image"
+                        ? <p className="whitespace-pre-wrap">{msg.content}</p>
+                        : null
                     )}
                   </div>
                   <button
@@ -408,8 +499,12 @@ export default function ChatPage() {
                     )}
                   </button>
                 </div>
+                <span className="text-xs text-base-content/40 px-1">
+                  {timeLabel}
+                </span>
               </div>
-            ))}
+              );
+            })}
 
             {loading && (
               <div className="flex justify-start">
