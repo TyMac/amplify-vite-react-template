@@ -14,6 +14,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  imageKey?: string; // S3 key for attached image (private/{identityId}/chat-images/...)
 }
 
 export interface ChatSession {
