@@ -41,6 +41,7 @@ const openSearchServerlessCollection = new oss.CfnCollection(
     name: collectionName,
     description: "DynamoDB to OpenSearch Pipeline ETL Integration for Chats.",
     type: "SEARCH",
+    standbyReplicas: "DISABLED",
   },
 );
 openSearchServerlessCollection.applyRemovalPolicy(RemovalPolicy.DESTROY);
