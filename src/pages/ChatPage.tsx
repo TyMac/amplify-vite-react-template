@@ -141,29 +141,53 @@ export default function ChatPage() {
     })();
   }, [messages]);
 
+  const LAST_SESSION_KEY = "barista_last_session_id";
+
+  function rememberSession(id: string) {
+    localStorage.setItem(LAST_SESSION_KEY, id);
+  }
+
   async function loadSession() {
     if (sessionId) {
       const s = await chatStorage.getSession(sessionId);
       if (s) {
+        rememberSession(s.id);
         setSession(s);
         setMessages(s.messages);
         setTags(s.tags ?? []);
         return;
       }
     }
-    // No session ID (bare /chat) — resume the most recent session instead of creating a new one
-    const sessions = await chatStorage.getSessions(); // sorted by updatedAt desc
+
+    // No session ID (bare /chat) — try to resume last known session
+    const lastId = localStorage.getItem(LAST_SESSION_KEY);
+    if (lastId) {
+      const s = await chatStorage.getSession(lastId);
+      if (s) {
+        setSession(s);
+        setMessages(s.messages);
+        setTags(s.tags ?? []);
+        navigate(`/chat/${s.id}`, { replace: true });
+        return;
+      }
+    }
+
+    // No localStorage hit — fall back to most recently updated session in DynamoDB
+    const sessions = await chatStorage.getSessions();
     if (sessions.length > 0) {
       const latest = sessions[0];
+      rememberSession(latest.id);
       setSession(latest);
       setMessages(latest.messages);
       setTags(latest.tags ?? []);
       navigate(`/chat/${latest.id}`, { replace: true });
       return;
     }
+
     // No sessions exist yet — create the first one
     const newSession = await chatStorage.createSession();
     if (newSession) {
+      rememberSession(newSession.id);
       setSession(newSession);
       setMessages(newSession.messages);
       setTags(newSession.tags ?? []);
@@ -199,6 +223,7 @@ export default function ChatPage() {
   async function switchSession(id: string) {
     const s = await chatStorage.getSession(id);
     if (s) {
+      rememberSession(s.id);
       setSession(s);
       setMessages(s.messages);
       setShowSidebar(false);
