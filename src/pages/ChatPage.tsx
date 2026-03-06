@@ -151,7 +151,17 @@ export default function ChatPage() {
         return;
       }
     }
-    // No session ID or not found — create new
+    // No session ID (bare /chat) — resume the most recent session instead of creating a new one
+    const sessions = await chatStorage.getSessions(); // sorted by updatedAt desc
+    if (sessions.length > 0) {
+      const latest = sessions[0];
+      setSession(latest);
+      setMessages(latest.messages);
+      setTags(latest.tags ?? []);
+      navigate(`/chat/${latest.id}`, { replace: true });
+      return;
+    }
+    // No sessions exist yet — create the first one
     const newSession = await chatStorage.createSession();
     if (newSession) {
       setSession(newSession);
