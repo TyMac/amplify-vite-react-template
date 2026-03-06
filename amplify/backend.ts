@@ -31,7 +31,7 @@ chatSessionTable.streamSpecification = {
 // Get the data stack
 const openSearchStack = Stack.of(backend.data);
 const region = openSearchStack.region;
-const collectionName = "chat-etl-collection";
+const collectionName = "chat-etl-col-v2";
 
 // Create OpenSearch Serverless Collection
 const openSearchServerlessCollection = new oss.CfnCollection(
