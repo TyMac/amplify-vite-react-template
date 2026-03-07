@@ -34,7 +34,7 @@ export const TAG_SUGGESTIONS: Record<string, string[]> = {
   ],
   Countries: ["Ethiopia", "Colombia", "Panama", "Kenya", "Guatemala", "Costa Rica", "Peru", "Brazil", "Yemen", "Honduras", "Rwanda", "Burundi", "Uganda", "Bolivia"],
   Regions: [
-    "Yirgacheffe", "Sidama", "Guji", "Gedeo",
+    "Yirgacheffe", "Sidama", "Bensa", "Guji", "Gedeo",
     "Huila", "Antioquia", "Nariño", "Cauca", "Tolima",
     "Chiriqui", "Volcan", "Boquete",
     "Nyeri", "Kirinyaga", "Murang'a",
