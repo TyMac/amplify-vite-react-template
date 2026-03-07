@@ -15,7 +15,7 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
       <div className="flex-1">
         <Link to="/" className="flex items-center gap-2 text-primary font-light text-xl tracking-widest">
           <span className="text-2xl">☕</span>
-          AI Barista
+          Barizta.AI
         </Link>
       </div>
       <div className="flex-none">
@@ -73,7 +73,7 @@ function HomePage() {
             <div className="text-center mb-12">
               <span className="text-5xl mb-4 block">☕</span>
               <h1 className="text-3xl font-light tracking-[0.2em] text-base-content mb-3">
-                AI Barista
+                Barizta.AI
               </h1>
               <p className="text-base-content/60 text-sm italic font-light max-w-md">
                 Your personal coffee companion — crafting the perfect cup, one conversation at a time.

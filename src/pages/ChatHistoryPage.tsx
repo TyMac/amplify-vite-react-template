@@ -225,7 +225,7 @@ function ChatHistoryPage() {
                   className={`chat ${msg.role === "user" ? "chat-end" : "chat-start"}`}
                 >
                   <div className="chat-header text-xs opacity-50 mb-1">
-                    {msg.role === "user" ? "You" : "AI Barista"}
+                    {msg.role === "user" ? "You" : "Barizta.AI"}
                   </div>
                   <div
                     className={`chat-bubble whitespace-pre-wrap text-sm ${
