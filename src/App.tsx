@@ -109,7 +109,7 @@ function HomePage() {
               >
                 <div className="card-body items-center text-center py-8">
                   <span className="text-3xl mb-2">☕</span>
-                  <h2 className="card-title text-xl font-semibold">Start Chatting</h2>
+                  <h2 className="card-title text-xl font-semibold">Coffee Talk</h2>
                   <p className="text-primary-content/80 text-sm font-light">
                     Get personalized brew recipes and coffee advice
                   </p>
