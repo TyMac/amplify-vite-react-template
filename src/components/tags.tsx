@@ -23,6 +23,7 @@ export function getTagColor(tag: string): string {
 
 // Suggested tags grouped by category
 export const TAG_SUGGESTIONS: Record<string, string[]> = {
+  Roasters: ["Leuchtfeuer"],
   Producers: [
     "William Ortiz", "Jamison Savage", "Diego Parra", "Tamiru Tadesse Tesema",
     "Jhonatan Pito", "Bukeye", "Reinaldo Chilito",
