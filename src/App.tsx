@@ -30,7 +30,7 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
             to="/chat"
             className={`btn btn-ghost btn-sm ${location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") ? "text-primary" : ""}`}
           >
-            Chat
+            Coffee Talk
           </Link>
           <Link
             to="/chats"
