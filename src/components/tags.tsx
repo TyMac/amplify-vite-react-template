@@ -41,7 +41,7 @@ export const TAG_SUGGESTIONS: Record<string, string[]> = {
     "Cajamarca", "Cerrado",
     "Kigali", "Kayanza",
   ],
-  Varietals: ["Gesha", "Pink Bourbon", "Bourbon", "Typica", "Caturra", "SL28", "Pacamara", "Castillo", "Sidra", "Sudan Rume", "74110", "74112"],
+  Varietals: ["Gesha", "Pink Bourbon", "Bourbon", "Typica", "Caturra", "SL28", "Pacamara", "Castillo", "Sidra", "Sudan Rume", "Laurina", "74110", "74112"],
   Process: ["Washed", "Natural", "Honey", "Anaerobic", "Extended Fermentation", "Carbonic Maceration"],
   Roast: ["Light", "Medium", "Dark"],
 };
