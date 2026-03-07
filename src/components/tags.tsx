@@ -30,7 +30,7 @@ export const TAG_SUGGESTIONS: Record<string, string[]> = {
   ],
   Farms: [
     "Finca Debora", "Gaharo Hill", "Dos Pinos", "La Hacienda",
-    "Alo Village", "Finca Soledad",
+    "Alo Village", "Finca Soledad", "Daterra",
   ],
   Countries: ["Ethiopia", "Colombia", "Panama", "Kenya", "Guatemala", "Costa Rica", "Peru", "Brazil", "Yemen", "Honduras", "Rwanda", "Burundi", "Uganda", "Bolivia"],
   Regions: [
