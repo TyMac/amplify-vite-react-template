@@ -38,7 +38,7 @@ export const TAG_SUGGESTIONS: Record<string, string[]> = {
     "Huila", "Antioquia", "Nariño", "Cauca", "Tolima",
     "Chiriqui", "Volcan", "Boquete",
     "Nyeri", "Kirinyaga", "Murang'a",
-    "Cajamarca",
+    "Cajamarca", "Cerrado",
     "Kigali", "Kayanza",
   ],
   Varietals: ["Gesha", "Pink Bourbon", "Bourbon", "Typica", "Caturra", "SL28", "Pacamara", "Castillo", "Sidra", "Sudan Rume", "74110", "74112"],
