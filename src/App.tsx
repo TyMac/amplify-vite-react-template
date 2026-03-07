@@ -10,37 +10,35 @@ import "./App.css";
 function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () => void }) {
   const location = useLocation();
 
+  const navLinks = [
+    { to: "/", label: "Home", active: location.pathname === "/" },
+    { to: "/chat", label: "Coffee Talk", active: location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") },
+    { to: "/chats", label: "History", active: location.pathname === "/chats" },
+  ];
+
   return (
     <div className="navbar bg-base-100 border-b border-base-200 px-4 sticky top-0 z-50">
+      {/* Brand */}
       <div className="flex-1">
         <Link to="/" className="flex items-center gap-2 text-primary font-light text-xl tracking-widest">
           <span className="text-2xl">☕</span>
           Barizta.AI
         </Link>
       </div>
-      <div className="flex-none">
+
+      {/* Desktop nav */}
+      <div className="hidden sm:flex flex-none">
         <nav className="flex items-center gap-1">
-          <Link
-            to="/"
-            className={`btn btn-ghost btn-sm ${location.pathname === "/" ? "text-primary" : ""}`}
-          >
-            Home
-          </Link>
-          <Link
-            to="/chat"
-            className={`btn btn-ghost btn-sm ${location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") ? "text-primary" : ""}`}
-          >
-            Coffee Talk
-          </Link>
-          <Link
-            to="/chats"
-            className={`btn btn-ghost btn-sm ${location.pathname === "/chats" ? "text-primary" : ""}`}
-          >
-            History
-          </Link>
+          {navLinks.map(({ to, label, active }) => (
+            <Link key={to} to={to} className={`btn btn-ghost btn-sm ${active ? "text-primary" : ""}`}>
+              {label}
+            </Link>
+          ))}
         </nav>
       </div>
-      <div className="flex-1 flex justify-end gap-2">
+
+      {/* Desktop right side */}
+      <div className="hidden sm:flex flex-1 justify-end gap-2">
         <ThemeToggle />
         {user && (
           <div className="dropdown dropdown-end">
@@ -51,12 +49,35 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
             </div>
             <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow-lg border border-base-200">
               <li className="menu-title text-xs opacity-60 px-2">{user.username}</li>
-              <li>
-                <button onClick={signOut} className="text-error">Sign out</button>
-              </li>
+              <li><button onClick={signOut} className="text-error">Sign out</button></li>
             </ul>
           </div>
         )}
+      </div>
+
+      {/* Mobile right side: theme toggle + hamburger */}
+      <div className="flex sm:hidden items-center gap-1">
+        <ThemeToggle />
+        <div className="dropdown dropdown-end">
+          <div tabIndex={0} role="button" className="btn btn-ghost btn-sm px-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </div>
+          <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-2 shadow-lg border border-base-200">
+            {navLinks.map(({ to, label, active }) => (
+              <li key={to}>
+                <Link to={to} className={active ? "text-primary font-medium" : ""}>{label}</Link>
+              </li>
+            ))}
+            {user && (
+              <>
+                <li className="menu-title text-xs opacity-60 px-2 pt-2">{user.username}</li>
+                <li><button onClick={signOut} className="text-error">Sign out</button></li>
+              </>
+            )}
+          </ul>
+        </div>
       </div>
     </div>
   );
