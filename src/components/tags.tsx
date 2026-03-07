@@ -23,9 +23,25 @@ export function getTagColor(tag: string): string {
 
 // Suggested tags grouped by category
 export const TAG_SUGGESTIONS: Record<string, string[]> = {
-  Varietals: ["Gesha", "Pink Bourbon", "Bourbon", "Typica", "Caturra", "SL28", "Pacamara", "Castillo"],
-  Origins: ["Ethiopia", "Colombia", "Panama", "Kenya", "Guatemala", "Costa Rica", "Peru", "Brazil", "Yemen", "Honduras"],
-  Process: ["Washed", "Natural", "Honey", "Anaerobic"],
+  Producers: [
+    "William Ortiz", "Jamison Savage", "Diego Parra", "Tamiru Tadesse Tesema",
+    "Jhonatan Pito", "Bukeye", "Reinaldo Chilito",
+  ],
+  Farms: [
+    "Finca Debora", "Gaharo Hill", "Dos Pinos", "La Hacienda",
+    "Alo Village", "Finca Soledad",
+  ],
+  Countries: ["Ethiopia", "Colombia", "Panama", "Kenya", "Guatemala", "Costa Rica", "Peru", "Brazil", "Yemen", "Honduras", "Rwanda", "Burundi", "Uganda", "Bolivia"],
+  Regions: [
+    "Yirgacheffe", "Sidama", "Guji", "Gedeo",
+    "Huila", "Antioquia", "Nariño", "Cauca", "Tolima",
+    "Chiriqui", "Volcan", "Boquete",
+    "Nyeri", "Kirinyaga", "Murang'a",
+    "Cajamarca",
+    "Kigali", "Kayanza",
+  ],
+  Varietals: ["Gesha", "Pink Bourbon", "Bourbon", "Typica", "Caturra", "SL28", "Pacamara", "Castillo", "Sidra", "Sudan Rume", "74110", "74112"],
+  Process: ["Washed", "Natural", "Honey", "Anaerobic", "Extended Fermentation", "Carbonic Maceration"],
   Roast: ["Light", "Medium", "Dark"],
 };
 
