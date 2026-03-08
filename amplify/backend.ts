@@ -6,6 +6,7 @@ import * as iam from "aws-cdk-lib/aws-iam";
 import * as osis from "aws-cdk-lib/aws-osis";
 import * as cdk from "aws-cdk-lib";
 import { RemovalPolicy, Stack } from "aws-cdk-lib";
+import { CfnUserPoolDomain } from "aws-cdk-lib/aws-cognito";
 import { LogGroup } from "aws-cdk-lib/aws-logs";
 import * as YAML from "yaml";
 import { auth } from "./auth/resource";
@@ -379,7 +380,6 @@ const cognitoCertArn = process.env.COGNITO_CERT_ARN;
 
 if (cognitoCustomDomain && cognitoCertArn) {
   const authStack = Stack.of(backend.auth.resources.userPool);
-  const { CfnUserPoolDomain } = require('aws-cdk-lib/aws-cognito');
   new CfnUserPoolDomain(authStack, 'CustomCognitoDomain', {
     domain: cognitoCustomDomain,
     userPoolId: backend.auth.resources.userPool.userPoolId,
