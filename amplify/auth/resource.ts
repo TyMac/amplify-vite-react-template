@@ -32,6 +32,7 @@ export const auth = defineAuth({
         'https://dev.d1dfxp3jics5eo.amplifyapp.com/',
         'https://dev.barizta.ai/',
         'https://www.dev.barizta.ai/',
+        'barista://',
       ],
       logoutUrls: [
         'exp://r_ecrrw-tymac-8081.exp.direct',
@@ -39,6 +40,7 @@ export const auth = defineAuth({
         'https://dev.d1dfxp3jics5eo.amplifyapp.com/',
         'https://dev.barizta.ai/',
         'https://www.dev.barizta.ai/',
+        'barista://',
       ],
     },
   },
