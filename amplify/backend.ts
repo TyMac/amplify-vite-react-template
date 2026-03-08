@@ -372,6 +372,23 @@ backend.geminiApi.resources.lambda.addToRolePolicy(
   }),
 );
 
+// Custom Cognito Domain (branch-specific via Amplify env vars)
+// Set COGNITO_CUSTOM_DOMAIN and COGNITO_CERT_ARN per branch in Amplify console
+const cognitoCustomDomain = process.env.COGNITO_CUSTOM_DOMAIN;
+const cognitoCertArn = process.env.COGNITO_CERT_ARN;
+
+if (cognitoCustomDomain && cognitoCertArn) {
+  const authStack = Stack.of(backend.auth.resources.userPool);
+  const { CfnUserPoolDomain } = require('aws-cdk-lib/aws-cognito');
+  new CfnUserPoolDomain(authStack, 'CustomCognitoDomain', {
+    domain: cognitoCustomDomain,
+    userPoolId: backend.auth.resources.userPool.userPoolId,
+    customDomainConfig: {
+      certificateArn: cognitoCertArn,
+    },
+  });
+}
+
 // Grant Gemini Lambda access to the storage bucket
 backend.storage.resources.bucket.grantReadWrite(
   backend.geminiApi.resources.lambda,
