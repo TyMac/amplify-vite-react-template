@@ -341,7 +341,7 @@ const cfnPipeline = new osis.CfnPipeline(
   openSearchStack,
   "OpenSearchIntegrationPipeline",
   {
-    maxUnits: 4,
+    maxUnits: 1,
     minUnits: 1,
     pipelineConfigurationBody: openSearchTemplate,
     pipelineName: "chat-integration",
