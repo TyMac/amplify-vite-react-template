@@ -5,6 +5,9 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
 import ChatHistoryPage from "./pages/ChatHistoryPage";
 import ChatPage from "./pages/ChatPage";
+import JournalPage from "./pages/JournalPage";
+import JournalEntryForm from "./pages/JournalEntryForm";
+import JournalEntryDetail from "./pages/JournalEntryDetail";
 import "./App.css";
 
 function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () => void }) {
@@ -13,6 +16,7 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
   const navLinks = [
     { to: "/", label: "Home", active: location.pathname === "/" },
     { to: "/chat", label: "Coffee Talk", active: location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") },
+    { to: "/journal", label: "Journal", active: location.pathname.startsWith("/journal") },
     { to: "/chats", label: "History", active: location.pathname === "/chats" },
   ];
 
@@ -117,6 +121,21 @@ function HomePage() {
               </Link>
 
               <Link
+                to="/journal"
+                className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+              >
+                <div className="card-body items-center text-center py-6">
+                  <span className="text-2xl mb-2">📓</span>
+                  <h2 className="card-title text-lg font-medium text-primary">
+                    Coffee Journal
+                  </h2>
+                  <p className="text-base-content/50 text-sm font-light">
+                    Log your brews, track flavor notes, and see your palate evolve.
+                  </p>
+                </div>
+              </Link>
+
+              <Link
                 to="/chats"
                 className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
               >
@@ -164,6 +183,45 @@ function ChatsPage() {
   );
 }
 
+function JournalPageWrapper() {
+  return (
+    <Authenticator>
+      {({ signOut, user }) => (
+        <div className="min-h-screen bg-base-300">
+          <NavBar user={user} signOut={signOut} />
+          <JournalPage />
+        </div>
+      )}
+    </Authenticator>
+  );
+}
+
+function JournalEntryFormWrapper() {
+  return (
+    <Authenticator>
+      {({ signOut, user }) => (
+        <div className="min-h-screen bg-base-300">
+          <NavBar user={user} signOut={signOut} />
+          <JournalEntryForm />
+        </div>
+      )}
+    </Authenticator>
+  );
+}
+
+function JournalEntryDetailWrapper() {
+  return (
+    <Authenticator>
+      {({ signOut, user }) => (
+        <div className="min-h-screen bg-base-300">
+          <NavBar user={user} signOut={signOut} />
+          <JournalEntryDetail />
+        </div>
+      )}
+    </Authenticator>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -172,6 +230,10 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/chat" element={<LiveChatPage />} />
           <Route path="/chat/:sessionId" element={<LiveChatPage />} />
+          <Route path="/journal" element={<JournalPageWrapper />} />
+          <Route path="/journal/new" element={<JournalEntryFormWrapper />} />
+          <Route path="/journal/:id" element={<JournalEntryDetailWrapper />} />
+          <Route path="/journal/:id/edit" element={<JournalEntryFormWrapper />} />
           <Route path="/chats" element={<ChatsPage />} />
         </Routes>
       </BrowserRouter>
