@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, Link, useSearchParams } from "react-router-dom";
 import { generateClient } from "aws-amplify/data";
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import type { Schema } from "../../amplify/data/resource";
 import FlavorWheelPicker from "../components/FlavorWheelPicker";
 import ScoreWheel from "../components/ScoreWheel";
+import { extractJournalFieldsFromChat } from "../services/gemini";
 
 const client = generateClient<Schema>();
 
@@ -41,6 +42,13 @@ function toISODateString(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
+function AIBadge({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span className="badge badge-sm badge-ghost ml-2 text-xs opacity-60">AI</span>
+  );
+}
+
 function computeDaysFromRoast(roastDate: string | null, brewDate: string | null): number | null {
   if (!roastDate || !brewDate) return null;
   const roast = new Date(roastDate);
@@ -65,11 +73,15 @@ export default function JournalEntryForm({
   onCancel,
 }: JournalEntryFormProps) {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const chatIdFromUrl = searchParams.get("chatId");
   const navigate = useNavigate();
   const { user } = useAuthenticator();
   const isEdit = Boolean(id);
 
   const [loading, setLoading] = useState(isEdit);
+  const [autoFilling, setAutoFilling] = useState(false);
+  const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
   // Coffee details
@@ -147,6 +159,118 @@ export default function JournalEntryForm({
       setSelectedChatIds((prev) => [...prev, preLinkedChatId]);
     }
   }, [preLinkedChatId]);
+
+  // Auto-fill from chat when chatId is present in URL
+  useEffect(() => {
+    const chatIdToUse = chatIdFromUrl || preLinkedChatId;
+    if (!chatIdToUse || isEdit) return;
+
+    // Also add to selected chat IDs if from URL
+    if (chatIdFromUrl && !selectedChatIds.includes(chatIdFromUrl)) {
+      setSelectedChatIds((prev) => [...prev, chatIdFromUrl]);
+    }
+
+    autoFillFromChat(chatIdToUse);
+  }, [chatIdFromUrl, preLinkedChatId, isEdit]);
+
+  async function autoFillFromChat(chatId: string) {
+    setAutoFilling(true);
+    try {
+      // Fetch the chat session
+      const { data: chatSession } = await client.models.ChatSession.get({ id: chatId });
+      if (!chatSession || !chatSession.messages) {
+        return;
+      }
+
+      // Parse messages from JSON
+      const messages = chatSession.messages as Array<{ role: string; content: string }>;
+      if (!messages || messages.length === 0) {
+        return;
+      }
+
+      // Call Gemini to extract fields
+      const { success, fields } = await extractJournalFieldsFromChat(messages);
+      if (!success) {
+        return;
+      }
+
+      // Apply extracted fields only to empty fields
+      const filledFields = new Set<string>();
+
+      if (fields.coffeeName && !coffeeName) {
+        setCoffeeName(fields.coffeeName);
+        filledFields.add("coffeeName");
+      }
+      if (fields.roaster && !roaster) {
+        setRoaster(fields.roaster);
+        filledFields.add("roaster");
+      }
+      if (fields.origin && !origin) {
+        setOrigin(fields.origin);
+        filledFields.add("origin");
+      }
+      if (fields.variety && !variety) {
+        setVariety(fields.variety);
+        filledFields.add("variety");
+      }
+      if (fields.processing && !processing) {
+        setProcessing(fields.processing);
+        filledFields.add("processing");
+      }
+      if (fields.roastLevel && !roastLevel) {
+        setRoastLevel(fields.roastLevel);
+        filledFields.add("roastLevel");
+      }
+      if (fields.roastDate && !roastDate) {
+        setRoastDate(fields.roastDate);
+        filledFields.add("roastDate");
+      }
+      if (fields.brewMethod && !brewMethod) {
+        setBrewMethod(fields.brewMethod);
+        filledFields.add("brewMethod");
+      }
+      if (fields.ratio && !ratio) {
+        setRatio(fields.ratio);
+        filledFields.add("ratio");
+      }
+      if (fields.dose && !dose) {
+        setDose(fields.dose);
+        filledFields.add("dose");
+      }
+      if (fields.brewTime && !brewTime) {
+        setBrewTime(fields.brewTime);
+        filledFields.add("brewTime");
+      }
+      if (fields.waterTemp && waterTemp === null) {
+        // Parse temperature - handle "93°C" or "200°F" formats
+        const tempMatch = fields.waterTemp.match(/(\d+)/);
+        if (tempMatch) {
+          let temp = parseInt(tempMatch[1], 10);
+          // Convert Fahrenheit to Celsius if needed
+          if (fields.waterTemp.toLowerCase().includes("f")) {
+            temp = Math.round((temp - 32) * 5 / 9);
+          }
+          setWaterTemp(temp);
+          filledFields.add("waterTemp");
+        }
+      }
+      if (fields.flavorNotes && fields.flavorNotes.length > 0 && flavorNotes.length === 0) {
+        setFlavorNotes(fields.flavorNotes);
+        filledFields.add("flavorNotes");
+      }
+      if (fields.tastingNotes && !tastingNotes) {
+        setTastingNotes(fields.tastingNotes);
+        filledFields.add("tastingNotes");
+      }
+
+      setAutoFilledFields(filledFields);
+    } catch (err) {
+      console.error("Failed to auto-fill from chat:", err);
+      // Silently fail - don't show error to user
+    } finally {
+      setAutoFilling(false);
+    }
+  }
 
   async function loadEntry(entryId: string) {
     try {
@@ -331,6 +455,13 @@ export default function JournalEntryForm({
         <div className="w-20" />
       </div>
 
+      {autoFilling && (
+        <div className="alert alert-info mb-4 py-2">
+          <span className="loading loading-spinner loading-sm"></span>
+          <span className="text-sm">Auto-filling from chat...</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         {/* Section: The Coffee */}
         <section className="card bg-base-100 shadow-sm border border-base-200">
@@ -341,7 +472,7 @@ export default function JournalEntryForm({
             <div className="flex flex-col gap-3">
               <div>
                 <label className="label py-1">
-                  <span className="label-text text-sm">Coffee Name *</span>
+                  <span className="label-text text-sm">Coffee Name *<AIBadge show={autoFilledFields.has("coffeeName")} /></span>
                 </label>
                 <input
                   type="text"
@@ -355,7 +486,7 @@ export default function JournalEntryForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Roaster</span>
+                    <span className="label-text text-sm">Roaster<AIBadge show={autoFilledFields.has("roaster")} /></span>
                   </label>
                   <input
                     type="text"
@@ -367,7 +498,7 @@ export default function JournalEntryForm({
                 </div>
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Origin</span>
+                    <span className="label-text text-sm">Origin<AIBadge show={autoFilledFields.has("origin")} /></span>
                   </label>
                   <input
                     type="text"
@@ -381,7 +512,7 @@ export default function JournalEntryForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Variety</span>
+                    <span className="label-text text-sm">Variety<AIBadge show={autoFilledFields.has("variety")} /></span>
                   </label>
                   <input
                     type="text"
@@ -393,7 +524,7 @@ export default function JournalEntryForm({
                 </div>
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Processing</span>
+                    <span className="label-text text-sm">Processing<AIBadge show={autoFilledFields.has("processing")} /></span>
                   </label>
                   <select
                     value={processing || ""}
@@ -412,7 +543,7 @@ export default function JournalEntryForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Roast Level</span>
+                    <span className="label-text text-sm">Roast Level<AIBadge show={autoFilledFields.has("roastLevel")} /></span>
                   </label>
                   <select
                     value={roastLevel || ""}
@@ -429,7 +560,7 @@ export default function JournalEntryForm({
                 </div>
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Roast Date</span>
+                    <span className="label-text text-sm">Roast Date<AIBadge show={autoFilledFields.has("roastDate")} /></span>
                   </label>
                   <input
                     type="date"
@@ -465,7 +596,7 @@ export default function JournalEntryForm({
                 </div>
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Method</span>
+                    <span className="label-text text-sm">Method<AIBadge show={autoFilledFields.has("brewMethod")} /></span>
                   </label>
                   <select
                     value={brewMethod}
@@ -484,7 +615,7 @@ export default function JournalEntryForm({
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Temp (°C)</span>
+                    <span className="label-text text-sm">Temp (°C)<AIBadge show={autoFilledFields.has("waterTemp")} /></span>
                   </label>
                   <input
                     type="number"
@@ -496,7 +627,7 @@ export default function JournalEntryForm({
                 </div>
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Ratio</span>
+                    <span className="label-text text-sm">Ratio<AIBadge show={autoFilledFields.has("ratio")} /></span>
                   </label>
                   <input
                     type="text"
@@ -508,7 +639,7 @@ export default function JournalEntryForm({
                 </div>
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Time</span>
+                    <span className="label-text text-sm">Time<AIBadge show={autoFilledFields.has("brewTime")} /></span>
                   </label>
                   <input
                     type="text"
@@ -522,7 +653,7 @@ export default function JournalEntryForm({
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Dose</span>
+                    <span className="label-text text-sm">Dose<AIBadge show={autoFilledFields.has("dose")} /></span>
                   </label>
                   <input
                     type="text"
@@ -642,7 +773,7 @@ export default function JournalEntryForm({
         <section className="card bg-base-100 shadow-sm border border-base-200">
           <div className="card-body p-4">
             <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Flavor Tags
+              Flavor Tags<AIBadge show={autoFilledFields.has("flavorNotes")} />
             </h2>
             <FlavorWheelPicker value={flavorNotes} onChange={setFlavorNotes} />
           </div>
@@ -657,7 +788,7 @@ export default function JournalEntryForm({
             <div className="flex flex-col gap-3">
               <div>
                 <label className="label py-1">
-                  <span className="label-text text-sm">Tasting Notes</span>
+                  <span className="label-text text-sm">Tasting Notes<AIBadge show={autoFilledFields.has("tastingNotes")} /></span>
                 </label>
                 <textarea
                   value={tastingNotes}

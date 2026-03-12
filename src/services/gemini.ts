@@ -49,3 +49,62 @@ export async function chatWithGemini(
   const parsed = JSON.parse(result.data);
   return parsed.response;
 }
+
+export interface ExtractedJournalFields {
+  coffeeName: string | null;
+  roaster: string | null;
+  origin: string | null;
+  variety: string | null;
+  processing: "WASHED" | "NATURAL" | "HONEY" | "ANAEROBIC" | "OTHER" | null;
+  roastLevel: "LIGHT" | "MEDIUM_LIGHT" | "MEDIUM" | "MEDIUM_DARK" | "DARK" | null;
+  roastDate: string | null;
+  brewMethod: string | null;
+  grindSize: string | null;
+  waterTemp: string | null;
+  ratio: string | null;
+  dose: string | null;
+  brewTime: string | null;
+  flavorNotes: string[];
+  tastingNotes: string | null;
+  confidence: "high" | "medium" | "low";
+}
+
+export async function extractJournalFieldsFromChat(
+  messages: { role: string; content: string }[]
+): Promise<{ success: boolean; fields: ExtractedJournalFields }> {
+  const messagesJson = messages.map((msg) => JSON.stringify(msg));
+
+  const result = await client.queries.extractJournalFields({
+    messages: messagesJson,
+  });
+
+  if (!result.data) {
+    return {
+      success: false,
+      fields: {
+        coffeeName: null,
+        roaster: null,
+        origin: null,
+        variety: null,
+        processing: null,
+        roastLevel: null,
+        roastDate: null,
+        brewMethod: null,
+        grindSize: null,
+        waterTemp: null,
+        ratio: null,
+        dose: null,
+        brewTime: null,
+        flavorNotes: [],
+        tastingNotes: null,
+        confidence: "low",
+      },
+    };
+  }
+
+  const parsed = JSON.parse(result.data);
+  return {
+    success: parsed.success,
+    fields: parsed.fields,
+  };
+}

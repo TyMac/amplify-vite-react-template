@@ -140,6 +140,8 @@ export async function handler(event: any) {
         return await geminiChat(args);
       case 'geminiVision':
         return await geminiVision(args);
+      case 'extractJournalFields':
+        return await extractJournalFields(args);
       default:
         console.error('Unknown field:', fieldName);
         console.error('Event keys:', Object.keys(event));
@@ -260,9 +262,119 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
   });
 
   const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'Could not analyze image';
-  
+
   return JSON.stringify({
     analysis: responseText,
     tokensUsed: result.usageMetadata?.totalTokenCount || 0,
   });
+}
+
+/**
+ * Extract journal fields from a chat conversation
+ */
+async function extractJournalFields(args: { messages: string[] }) {
+  const { messages: messagesJson } = args;
+
+  // Parse messages from JSON strings
+  const messages: Array<{ role: string; content: string }> = messagesJson.map(m => JSON.parse(m));
+
+  // Format conversation for the prompt
+  const conversationText = messages
+    .map((msg) => `${msg.role.toUpperCase()}: ${msg.content}`)
+    .join('\n\n');
+
+  const extractionPrompt = `You are a coffee journal assistant. Given the following Coffee Talk conversation, extract any coffee-related information mentioned. Return ONLY a valid JSON object with these fields (use null for fields not mentioned):
+
+{
+  "coffeeName": string | null,        // name of the coffee/blend
+  "roaster": string | null,           // roaster name
+  "origin": string | null,           // country or region of origin
+  "variety": string | null,           // bean variety (gesha, bourbon, typica, etc.)
+  "processing": "WASHED" | "NATURAL" | "HONEY" | "ANAEROBIC" | "OTHER" | null,
+  "roastLevel": "LIGHT" | "MEDIUM_LIGHT" | "MEDIUM" | "MEDIUM_DARK" | "DARK" | null,
+  "roastDate": string | null,         // ISO date string if mentioned (YYYY-MM-DD)
+  "brewMethod": string | null,        // V60, Chemex, AeroPress, French Press, Espresso, etc.
+  "grindSize": string | null,         // coarse, medium-coarse, medium, fine, or specific microns
+  "waterTemp": string | null,         // e.g. "93°C" or "200°F"
+  "ratio": string | null,             // e.g. "1:16"
+  "dose": string | null,              // e.g. "20g"
+  "brewTime": string | null,          // e.g. "3:30"
+  "flavorNotes": string[],            // array of flavor descriptors mentioned
+  "tastingNotes": string | null,      // free text summary of tasting notes from the chat
+  "confidence": "high" | "medium" | "low"  // how confident you are in the extraction
+}
+
+Conversation:
+${conversationText}
+
+Return ONLY the JSON object, no markdown, no explanation.`;
+
+  const model = 'gemini-2.0-flash-lite-001';
+
+  const payload = {
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: extractionPrompt }],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.2, // Lower temperature for more consistent JSON output
+      maxOutputTokens: 1024,
+    },
+  };
+
+  try {
+    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
+    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+
+    // Try to parse the JSON response
+    try {
+      // Clean up potential markdown code blocks
+      let cleanedResponse = responseText.trim();
+      if (cleanedResponse.startsWith('```json')) {
+        cleanedResponse = cleanedResponse.slice(7);
+      } else if (cleanedResponse.startsWith('```')) {
+        cleanedResponse = cleanedResponse.slice(3);
+      }
+      if (cleanedResponse.endsWith('```')) {
+        cleanedResponse = cleanedResponse.slice(0, -3);
+      }
+      cleanedResponse = cleanedResponse.trim();
+
+      const parsed = JSON.parse(cleanedResponse);
+      return JSON.stringify({
+        success: true,
+        fields: parsed,
+        tokensUsed: result.usageMetadata?.totalTokenCount || 0,
+      });
+    } catch (parseError) {
+      console.error('Failed to parse extraction response:', responseText);
+      return JSON.stringify({
+        success: false,
+        fields: {
+          coffeeName: null,
+          roaster: null,
+          origin: null,
+          variety: null,
+          processing: null,
+          roastLevel: null,
+          roastDate: null,
+          brewMethod: null,
+          grindSize: null,
+          waterTemp: null,
+          ratio: null,
+          dose: null,
+          brewTime: null,
+          flavorNotes: [],
+          tastingNotes: null,
+          confidence: 'low',
+        },
+        tokensUsed: result.usageMetadata?.totalTokenCount || 0,
+      });
+    }
+  } catch (error: any) {
+    console.error('extractJournalFields failed:', error.message);
+    throw error;
+  }
 }

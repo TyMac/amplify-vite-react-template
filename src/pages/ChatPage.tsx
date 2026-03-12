@@ -231,7 +231,7 @@ export default function ChatPage() {
 
   function handleNewJournalEntry() {
     if (sessionId) {
-      navigate(`/journal?chatId=${sessionId}`);
+      navigate(`/journal/new?chatId=${sessionId}`);
     }
   }
 

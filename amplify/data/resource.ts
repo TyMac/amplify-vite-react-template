@@ -321,6 +321,15 @@ const schema = a.schema({
     .returns(a.string()) // JSON response
     .authorization((allow) => [allow.publicApiKey()])
     .handler(a.handler.function(geminiApi)),
+
+  extractJournalFields: a
+    .query()
+    .arguments({
+      messages: a.string().array().required(), // JSON stringified messages
+    })
+    .returns(a.string()) // JSON response with extracted fields
+    .authorization((allow) => [allow.publicApiKey()])
+    .handler(a.handler.function(geminiApi)),
 });
 
 export type Schema = ClientSchema<typeof schema>;
