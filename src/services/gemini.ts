@@ -70,9 +70,17 @@ export interface ExtractedJournalFields {
 }
 
 export async function extractJournalFieldsFromChat(
-  messages: { role: string; content: string }[]
+  messages: { role: string; content: string }[],
+  tags: string[] = []
 ): Promise<{ success: boolean; fields: ExtractedJournalFields }> {
   const messagesJson = messages.map((msg) => JSON.stringify(msg));
+  // Append a synthetic context message with the chat tags so the Lambda can use them
+  if (tags.length > 0) {
+    messagesJson.push(JSON.stringify({
+      role: "system",
+      content: `[Chat tags for additional context: ${tags.join(", ")}]`,
+    }));
+  }
 
   const result = await client.queries.extractJournalFields({
     messages: messagesJson,

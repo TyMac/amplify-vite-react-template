@@ -6,6 +6,7 @@ import type { Schema } from "../../amplify/data/resource";
 import FlavorWheelPicker from "../components/FlavorWheelPicker";
 import ScoreWheel from "../components/ScoreWheel";
 import { extractJournalFieldsFromChat } from "../services/gemini";
+import { TAG_SUGGESTIONS } from "../components/tags";
 
 const client = generateClient<Schema>();
 
@@ -194,10 +195,41 @@ export default function JournalEntryForm({
         return;
       }
 
-      // Call Gemini to extract fields
-      const { success, fields } = await extractJournalFieldsFromChat(messages);
+      // Grab tags from the chat session
+      const tags: string[] = (chatSession.tags as string[] | null) ?? [];
+
+      // Call Gemini to extract fields (pass tags as additional context)
+      const { success, fields } = await extractJournalFieldsFromChat(messages, tags);
       if (!success) {
         return;
+      }
+
+      // --- Client-side tag mapping (deterministic, instant) ---
+      // Map known tags directly to fields using the TAG_SUGGESTIONS taxonomy
+      const roasterTags = TAG_SUGGESTIONS["Roasters"] ?? [];
+      const countryTags = TAG_SUGGESTIONS["Countries"] ?? [];
+      const regionTags = TAG_SUGGESTIONS["Regions"] ?? [];
+      const varietalTags = TAG_SUGGESTIONS["Varietals"] ?? [];
+      const processTags = TAG_SUGGESTIONS["Process"] ?? [];
+      const roastTags = TAG_SUGGESTIONS["Roast"] ?? [];
+
+      const processMap: Record<string, BrewJournalInput["processing"]> = {
+        "Washed": "WASHED", "Natural": "NATURAL", "Honey": "HONEY",
+        "White Honey": "HONEY", "Fermented Honey": "HONEY",
+        "Anaerobic": "ANAEROBIC", "Natural Anaerobic": "ANAEROBIC",
+        "Extended Fermentation": "ANAEROBIC", "Carbonic Maceration": "ANAEROBIC",
+      };
+      const roastMap: Record<string, BrewJournalInput["roastLevel"]> = {
+        "Light": "LIGHT", "Medium": "MEDIUM", "Dark": "DARK",
+      };
+
+      for (const tag of tags) {
+        if (roasterTags.includes(tag) && !fields.roaster) fields.roaster = tag;
+        if (countryTags.includes(tag) && !fields.origin) fields.origin = tag;
+        if (regionTags.includes(tag) && !fields.origin) fields.origin = tag;
+        if (varietalTags.includes(tag) && !fields.variety) fields.variety = tag;
+        if (processTags.includes(tag) && !fields.processing) fields.processing = processMap[tag] ?? null;
+        if (roastTags.includes(tag) && !fields.roastLevel) fields.roastLevel = roastMap[tag] ?? null;
       }
 
       // Apply extracted fields only to empty fields
