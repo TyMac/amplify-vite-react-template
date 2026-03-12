@@ -182,8 +182,14 @@ export default function JournalEntryForm({
         return;
       }
 
-      // Parse messages from JSON
-      const messages = chatSession.messages as Array<{ role: string; content: string }>;
+      // messages is stored as a JSON string — parse it
+      let messages: Array<{ role: string; content: string }> = [];
+      try {
+        const raw = chatSession.messages;
+        messages = typeof raw === "string" ? JSON.parse(raw) : (raw as any);
+      } catch {
+        return;
+      }
       if (!messages || messages.length === 0) {
         return;
       }
