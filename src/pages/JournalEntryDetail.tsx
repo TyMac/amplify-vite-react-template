@@ -11,10 +11,18 @@ function formatDate(dateStr: string | null | undefined): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-export default function JournalEntryDetail() {
-  const { id } = useParams();
+interface JournalEntryDetailProps {
+  embedded?: boolean;
+  entryId?: string;
+  onEdit?: () => void;
+}
+
+export default function JournalEntryDetail({ embedded, entryId: propEntryId, onEdit }: JournalEntryDetailProps) {
+  const { id: paramId } = useParams();
+  const id = propEntryId ?? paramId;
+
   const [entry, setEntry] = useState<Schema["BrewJournal"]["type"] | null>(null);
-  const [chatSession, setChatSession] = useState<Schema["ChatSession"]["type"] | null>(null);
+  const [linkedChats, setLinkedChats] = useState<Schema["ChatSession"]["type"][]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,8 +35,10 @@ export default function JournalEntryDetail() {
     try {
       const { data } = await client.models.BrewJournal.get({ id: entryId });
       setEntry(data);
-      if (data?.chatSessionId) {
-        loadChatSession(data.chatSessionId);
+      if (data?.chatSessionIds && data.chatSessionIds.length > 0) {
+        loadLinkedChats(data.chatSessionIds.filter((id): id is string => id !== null));
+      } else {
+        setLinkedChats([]);
       }
     } catch (err) {
       console.error("Failed to load entry:", err);
@@ -37,12 +47,18 @@ export default function JournalEntryDetail() {
     }
   }
 
-  async function loadChatSession(sessionId: string) {
+  async function loadLinkedChats(chatIds: string[]) {
     try {
-      const { data } = await client.models.ChatSession.get({ id: sessionId });
-      setChatSession(data);
+      const chats: Schema["ChatSession"]["type"][] = [];
+      for (const chatId of chatIds) {
+        const { data } = await client.models.ChatSession.get({ id: chatId });
+        if (data) {
+          chats.push(data);
+        }
+      }
+      setLinkedChats(chats);
     } catch (err) {
-      console.error("Failed to load chat session:", err);
+      console.error("Failed to load chat sessions:", err);
     }
   }
 
@@ -56,7 +72,7 @@ export default function JournalEntryDetail() {
 
   if (!entry) {
     return (
-      <div className="max-w-2xl mx-auto px-4 py-6">
+      <div className={embedded ? "p-6" : "max-w-2xl mx-auto px-4 py-6"}>
         <div className="card bg-base-100">
           <div className="card-body items-center text-center py-12">
             <p className="text-base-content/50">Entry not found.</p>
@@ -87,16 +103,29 @@ export default function JournalEntryDetail() {
     );
   };
 
+  const containerClass = embedded
+    ? "p-6"
+    : "max-w-2xl mx-auto px-4 py-6";
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className={containerClass}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <Link to="/journal" className="btn btn-ghost btn-sm gap-2">
-          <span>←</span> Back
-        </Link>
-        <Link to={`/journal/${id}/edit`} className="btn btn-ghost btn-sm">
-          Edit
-        </Link>
+        {!embedded && (
+          <Link to="/journal" className="btn btn-ghost btn-sm gap-2">
+            <span>←</span> Back
+          </Link>
+        )}
+        {embedded && <div />}
+        {onEdit ? (
+          <button onClick={onEdit} className="btn btn-ghost btn-sm">
+            Edit
+          </button>
+        ) : (
+          <Link to={`/journal/${id}/edit`} className="btn btn-ghost btn-sm">
+            Edit
+          </Link>
+        )}
       </div>
 
       {/* Coffee Title */}
@@ -260,20 +289,28 @@ export default function JournalEntryDetail() {
         </div>
       )}
 
-      {/* Linked Chat */}
-      {chatSession && (
+      {/* Linked Chats */}
+      {linkedChats.length > 0 && (
         <div className="card bg-base-100 shadow-sm border border-base-200 mb-6">
           <div className="card-body p-4">
             <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Linked Coffee Talk
+              Linked Coffee Talks
             </h2>
-            <Link
-              to={`/chat/${chatSession.id}`}
-              className="flex items-center justify-between p-3 rounded-lg border border-base-200 hover:border-primary/50 transition-colors"
-            >
-              <span className="text-sm font-medium truncate">{chatSession.name}</span>
-              <span className="text-primary">→</span>
-            </Link>
+            <div className="flex flex-col gap-2">
+              {linkedChats.map((chat) => (
+                <Link
+                  key={chat.id}
+                  to={`/chat/${chat.id}`}
+                  className="flex items-center justify-between p-3 rounded-lg border border-base-200 hover:border-primary/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">💬</span>
+                    <span className="text-sm font-medium truncate">{chat.name}</span>
+                  </div>
+                  <span className="text-primary">→</span>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       )}

@@ -223,7 +223,7 @@ const schema = a.schema({
   BrewJournal: a
     .model({
       userId: a.string(), // null for anonymous, populated for authenticated
-      chatSessionId: a.string(), // link to ChatSession
+      chatSessionIds: a.string().array(), // links to ChatSession (multiple chats can be pinned)
 
       // Coffee details
       coffeeName: a.string().required(),
@@ -275,7 +275,7 @@ const schema = a.schema({
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
     })
-    .secondaryIndexes((index) => [index("userId"), index("chatSessionId")])
+    .secondaryIndexes((index) => [index("userId")])
     .authorization((allow) => [
       allow.publicApiKey().to(["create", "read", "update", "delete"]),
       allow.owner(),

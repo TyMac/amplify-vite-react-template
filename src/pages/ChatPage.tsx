@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getUrl } from "aws-amplify/storage";
+import { generateClient } from "aws-amplify/data";
+import type { Schema } from "../../amplify/data/resource";
 import {
   chatStorage,
   type ChatMessage,
@@ -8,6 +10,8 @@ import {
 } from "../services/chatStorage";
 import { chatWithGemini } from "../services/gemini";
 import { TagChip, TagEditor } from "../components/tags";
+
+const client = generateClient<Schema>();
 
 /** Render basic markdown: **bold**, bullet lines, headings */
 function FormattedMessage({ content }: { content: string }) {
@@ -83,6 +87,13 @@ export default function ChatPage() {
   // Cache of resolved S3 presigned URLs: messageId → url
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
+  // Journal linking state
+  const [linkedJournalEntry, setLinkedJournalEntry] = useState<Schema["BrewJournal"]["type"] | null>(null);
+  const [showJournalModal, setShowJournalModal] = useState(false);
+  const [journalEntries, setJournalEntries] = useState<Schema["BrewJournal"]["type"][]>([]);
+  const [journalSearchQuery, setJournalSearchQuery] = useState("");
+  const [pinningToEntry, setPinningToEntry] = useState(false);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
@@ -95,6 +106,13 @@ export default function ChatPage() {
 
   useEffect(() => {
     loadSession();
+  }, [sessionId]);
+
+  // Check if this chat is linked to any journal entry
+  useEffect(() => {
+    if (sessionId) {
+      checkJournalLink(sessionId);
+    }
   }, [sessionId]);
 
   // Auto-scroll on new messages
@@ -146,6 +164,83 @@ export default function ChatPage() {
   function rememberSession(id: string) {
     localStorage.setItem(LAST_SESSION_KEY, id);
   }
+
+  async function checkJournalLink(chatId: string) {
+    try {
+      const { data } = await client.models.BrewJournal.list();
+      const linkedEntry = (data ?? []).find((entry) =>
+        (entry.chatSessionIds ?? []).includes(chatId)
+      );
+      setLinkedJournalEntry(linkedEntry ?? null);
+    } catch (err) {
+      console.error("Failed to check journal link:", err);
+    }
+  }
+
+  async function loadJournalEntries() {
+    try {
+      const { data } = await client.models.BrewJournal.list();
+      const sorted = [...(data ?? [])].sort((a, b) => {
+        const dateA = a.brewDate ? new Date(a.brewDate).getTime() : 0;
+        const dateB = b.brewDate ? new Date(b.brewDate).getTime() : 0;
+        return dateB - dateA;
+      });
+      setJournalEntries(sorted);
+    } catch (err) {
+      console.error("Failed to load journal entries:", err);
+    }
+  }
+
+  async function pinToExistingEntry(entryId: string) {
+    if (!sessionId) return;
+    setPinningToEntry(true);
+    try {
+      const entry = journalEntries.find((e) => e.id === entryId);
+      if (!entry) return;
+
+      const currentIds = (entry.chatSessionIds ?? []).filter((id): id is string => id !== null);
+      if (currentIds.includes(sessionId)) {
+        setLinkedJournalEntry(entry);
+        setShowJournalModal(false);
+        return;
+      }
+
+      await client.models.BrewJournal.update({
+        id: entryId,
+        chatSessionIds: [...currentIds, sessionId],
+      });
+
+      // Refresh the linked state
+      await checkJournalLink(sessionId);
+      setShowJournalModal(false);
+    } catch (err) {
+      console.error("Failed to pin to entry:", err);
+    } finally {
+      setPinningToEntry(false);
+    }
+  }
+
+  function handleJournalButtonClick() {
+    if (linkedJournalEntry) {
+      navigate(`/journal`);
+    } else {
+      loadJournalEntries();
+      setShowJournalModal(true);
+    }
+  }
+
+  function handleNewJournalEntry() {
+    if (sessionId) {
+      navigate(`/journal?chatId=${sessionId}`);
+    }
+  }
+
+  const filteredJournalEntries = journalSearchQuery.trim()
+    ? journalEntries.filter((e) =>
+        e.coffeeName.toLowerCase().includes(journalSearchQuery.toLowerCase()) ||
+        (e.roaster?.toLowerCase().includes(journalSearchQuery.toLowerCase()) ?? false)
+      )
+    : journalEntries.slice(0, 10);
 
   async function loadSession() {
     if (sessionId) {
@@ -408,7 +503,7 @@ export default function ChatPage() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Chat header */}
         <div className="px-4 py-2 border-b border-base-200 bg-base-100">
-          {/* Row 1: sidebar toggle + title */}
+          {/* Row 1: sidebar toggle + title + journal button */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
@@ -435,6 +530,18 @@ export default function ChatPage() {
             >
               {session?.name || "Chat"}
             </h2>
+            {/* Journal button */}
+            <button
+              onClick={handleJournalButtonClick}
+              className={`btn btn-sm gap-1 ${
+                linkedJournalEntry ? "btn-success" : "btn-ghost"
+              }`}
+            >
+              <span>📔</span>
+              <span className="hidden sm:inline">
+                {linkedJournalEntry ? "Journaled" : "Journal"}
+              </span>
+            </button>
           </div>
 
           {/* Row 2: tags + add button */}
@@ -606,6 +713,81 @@ export default function ChatPage() {
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={() => setRenamingId(null)}>close</button>
+          </form>
+        </dialog>
+      )}
+
+      {/* Journal linking modal */}
+      {showJournalModal && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg mb-4">Link to Journal</h3>
+            <p className="text-sm text-base-content/60 mb-4">
+              Connect this chat to a journal entry
+            </p>
+
+            <div className="flex flex-col gap-3">
+              {/* New entry option */}
+              <button
+                onClick={handleNewJournalEntry}
+                className="btn btn-primary w-full gap-2"
+              >
+                <span>+</span>
+                New Journal Entry
+              </button>
+
+              <div className="divider text-xs text-base-content/40">OR</div>
+
+              {/* Pin to existing */}
+              <div>
+                <p className="text-sm font-medium mb-2">Pin to Existing Entry</p>
+                <input
+                  type="text"
+                  value={journalSearchQuery}
+                  onChange={(e) => setJournalSearchQuery(e.target.value)}
+                  className="input input-bordered input-sm w-full mb-2"
+                  placeholder="Search entries..."
+                />
+                <div className="max-h-48 overflow-y-auto flex flex-col gap-1">
+                  {filteredJournalEntries.length === 0 ? (
+                    <p className="text-xs text-base-content/40 text-center py-4">
+                      No journal entries found
+                    </p>
+                  ) : (
+                    filteredJournalEntries.map((entry) => (
+                      <button
+                        key={entry.id}
+                        onClick={() => pinToExistingEntry(entry.id)}
+                        disabled={pinningToEntry}
+                        className="flex items-center justify-between p-2 rounded-lg border border-base-200 hover:border-primary/50 transition-colors text-left"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{entry.coffeeName}</p>
+                          <p className="text-xs text-base-content/50">
+                            {entry.brewDate ? new Date(entry.brewDate).toLocaleDateString() : "No date"}
+                            {entry.roaster && ` · ${entry.roaster}`}
+                          </p>
+                        </div>
+                        {pinningToEntry ? (
+                          <span className="loading loading-spinner loading-xs"></span>
+                        ) : (
+                          <span className="text-xs text-base-content/40">Pin</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-action">
+              <button className="btn btn-ghost" onClick={() => setShowJournalModal(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setShowJournalModal(false)}>close</button>
           </form>
         </dialog>
       )}

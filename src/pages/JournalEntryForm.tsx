@@ -49,7 +49,21 @@ function computeDaysFromRoast(roastDate: string | null, brewDate: string | null)
   return diff >= 0 ? diff : null;
 }
 
-export default function JournalEntryForm() {
+interface JournalEntryFormProps {
+  embedded?: boolean;
+  preLinkedChatId?: string;
+  selectedDate?: string;
+  onSave?: (entryId: string) => void;
+  onCancel?: () => void;
+}
+
+export default function JournalEntryForm({
+  embedded,
+  preLinkedChatId,
+  selectedDate,
+  onSave,
+  onCancel,
+}: JournalEntryFormProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthenticator();
@@ -68,7 +82,9 @@ export default function JournalEntryForm() {
   const [roastDate, setRoastDate] = useState<string | null>(null);
 
   // Brew details
-  const [brewDate, setBrewDate] = useState<string>(toISODateString(new Date()));
+  const [brewDate, setBrewDate] = useState<string>(
+    selectedDate ?? toISODateString(new Date())
+  );
   const [brewMethod, setBrewMethod] = useState("");
   const [waterTemp, setWaterTemp] = useState<number | null>(null);
   const [ratio, setRatio] = useState("");
@@ -96,9 +112,12 @@ export default function JournalEntryForm() {
   const [tastingNotes, setTastingNotes] = useState("");
   const [finishNote, setFinishNote] = useState("");
 
-  // Chat session link
+  // Chat session links (multiple)
   const [chatSessions, setChatSessions] = useState<Schema["ChatSession"]["type"][]>([]);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedChatIds, setSelectedChatIds] = useState<string[]>(
+    preLinkedChatId ? [preLinkedChatId] : []
+  );
+  const [chatSearchQuery, setChatSearchQuery] = useState("");
 
   // Rating
   const [rating, setRating] = useState(5);
@@ -114,6 +133,20 @@ export default function JournalEntryForm() {
     }
     loadChatSessions();
   }, [id, user]);
+
+  // Update selectedDate when prop changes
+  useEffect(() => {
+    if (selectedDate) {
+      setBrewDate(selectedDate);
+    }
+  }, [selectedDate]);
+
+  // Update preLinkedChatId when prop changes
+  useEffect(() => {
+    if (preLinkedChatId && !selectedChatIds.includes(preLinkedChatId)) {
+      setSelectedChatIds((prev) => [...prev, preLinkedChatId]);
+    }
+  }, [preLinkedChatId]);
 
   async function loadEntry(entryId: string) {
     try {
@@ -145,7 +178,7 @@ export default function JournalEntryForm() {
         setFlavorNotes((data.flavorNotes ?? []).filter((n): n is string => n !== null));
         setTastingNotes(data.tastingNotes || "");
         setFinishNote(data.finishNote || "");
-        setSelectedChatId(data.chatSessionId || null);
+        setSelectedChatIds((data.chatSessionIds ?? []).filter((id): id is string => id !== null));
         setRating(data.rating ?? 5);
       }
     } catch (err) {
@@ -166,12 +199,39 @@ export default function JournalEntryForm() {
           const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
           const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
           return dateB - dateA;
-        })
-        .slice(0, 5);
+        });
       setChatSessions(sorted);
     } catch (err) {
       console.error("Failed to load chat sessions:", err);
     }
+  }
+
+  // Get linked chat sessions details
+  const linkedChatDetails = useMemo(() => {
+    return selectedChatIds
+      .map((id) => chatSessions.find((s) => s.id === id))
+      .filter((s): s is Schema["ChatSession"]["type"] => s !== undefined);
+  }, [selectedChatIds, chatSessions]);
+
+  // Filter available chats for selection (not already linked)
+  const availableChats = useMemo(() => {
+    const filtered = chatSessions.filter((s) => !selectedChatIds.includes(s.id));
+    if (!chatSearchQuery.trim()) {
+      return filtered.slice(0, 5);
+    }
+    const query = chatSearchQuery.toLowerCase();
+    return filtered.filter((s) => s.name.toLowerCase().includes(query)).slice(0, 5);
+  }, [chatSessions, selectedChatIds, chatSearchQuery]);
+
+  function addChatLink(chatId: string) {
+    if (!selectedChatIds.includes(chatId)) {
+      setSelectedChatIds((prev) => [...prev, chatId]);
+    }
+    setChatSearchQuery("");
+  }
+
+  function removeChatLink(chatId: string) {
+    setSelectedChatIds((prev) => prev.filter((id) => id !== chatId));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -182,7 +242,7 @@ export default function JournalEntryForm() {
     try {
       const entryData: BrewJournalInput = {
         userId: user?.userId || null,
-        chatSessionId: selectedChatId,
+        chatSessionIds: selectedChatIds,
         coffeeName: coffeeName.trim(),
         roaster: roaster.trim() || null,
         origin: origin.trim() || null,
@@ -221,11 +281,23 @@ export default function JournalEntryForm() {
         resultId = data!.id;
       }
 
-      navigate(`/journal/${resultId}`);
+      if (onSave) {
+        onSave(resultId);
+      } else {
+        navigate(`/journal/${resultId}`);
+      }
     } catch (err) {
       console.error("Failed to save entry:", err);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function handleCancel() {
+    if (onCancel) {
+      onCancel();
+    } else {
+      navigate("/journal");
     }
   }
 
@@ -237,12 +309,22 @@ export default function JournalEntryForm() {
     );
   }
 
+  const containerClass = embedded
+    ? "p-6"
+    : "max-w-2xl mx-auto px-4 py-6";
+
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6">
+    <div className={containerClass}>
       <div className="flex items-center justify-between mb-6">
-        <Link to="/journal" className="btn btn-ghost btn-sm gap-2">
-          <span>←</span> Back
-        </Link>
+        {!embedded ? (
+          <Link to="/journal" className="btn btn-ghost btn-sm gap-2">
+            <span>←</span> Back
+          </Link>
+        ) : (
+          <button onClick={handleCancel} className="btn btn-ghost btn-sm gap-2">
+            <span>←</span> Cancel
+          </button>
+        )}
         <h1 className="text-xl font-light tracking-wide text-base-content">
           {isEdit ? "Edit Entry" : "New Entry"}
         </h1>
@@ -601,37 +683,64 @@ export default function JournalEntryForm() {
           </div>
         </section>
 
-        {/* Section: Coffee Talk Link */}
-        {chatSessions.length > 0 && (
-          <section className="card bg-base-100 shadow-sm border border-base-200">
-            <div className="card-body p-4">
-              <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-                Link to Coffee Talk
-              </h2>
-              <div className="flex flex-col gap-2">
-                {chatSessions.map((session) => (
-                  <button
-                    key={session.id}
-                    type="button"
-                    onClick={() =>
-                      setSelectedChatId(selectedChatId === session.id ? null : session.id)
-                    }
-                    className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
-                      selectedChatId === session.id
-                        ? "border-primary bg-primary/5"
-                        : "border-base-200 hover:border-base-300"
-                    }`}
+        {/* Section: Coffee Talk Links */}
+        <section className="card bg-base-100 shadow-sm border border-base-200">
+          <div className="card-body p-4">
+            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
+              Link to Coffee Talks
+            </h2>
+
+            {/* Linked chats as chips */}
+            {linkedChatDetails.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {linkedChatDetails.map((chat) => (
+                  <div
+                    key={chat.id}
+                    className="badge badge-lg gap-2 pr-1"
                   >
-                    <span className="text-sm truncate">{session.name}</span>
-                    {selectedChatId === session.id && (
-                      <span className="text-primary">✓</span>
-                    )}
-                  </button>
+                    <span className="truncate max-w-[150px]">💬 {chat.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeChatLink(chat.id)}
+                      className="btn btn-ghost btn-xs btn-circle"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 ))}
               </div>
+            )}
+
+            {/* Search and add chats */}
+            <div>
+              <input
+                type="text"
+                value={chatSearchQuery}
+                onChange={(e) => setChatSearchQuery(e.target.value)}
+                className="input input-bordered input-sm w-full mb-2"
+                placeholder="Search chats to link..."
+              />
+              {availableChats.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  {availableChats.map((session) => (
+                    <button
+                      key={session.id}
+                      type="button"
+                      onClick={() => addChatLink(session.id)}
+                      className="flex items-center justify-between p-2 rounded-lg border border-base-200 hover:border-primary/50 transition-colors text-left"
+                    >
+                      <span className="text-sm truncate">{session.name}</span>
+                      <span className="text-xs text-base-content/40">+</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {availableChats.length === 0 && chatSearchQuery && (
+                <p className="text-xs text-base-content/40">No matching chats found</p>
+              )}
             </div>
-          </section>
-        )}
+          </div>
+        </section>
 
         {/* Section: Rating */}
         <section className="card bg-base-100 shadow-sm border border-base-200">
