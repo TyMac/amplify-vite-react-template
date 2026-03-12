@@ -230,6 +230,15 @@ const schema = a.schema({
       roaster: a.string(),
       roastDate: a.date(),
       origin: a.string(),
+      variety: a.string(), // bean variety e.g. gesha, bourbon
+      processing: a.enum(["WASHED", "NATURAL", "HONEY", "ANAEROBIC", "OTHER"]),
+      roastLevel: a.enum([
+        "LIGHT",
+        "MEDIUM_LIGHT",
+        "MEDIUM",
+        "MEDIUM_DARK",
+        "DARK",
+      ]),
 
       // Brew details
       brewMethod: a.string(),
@@ -239,17 +248,26 @@ const schema = a.schema({
       ratio: a.string(), // "1:16"
       dose: a.string(), // "20g"
       yield: a.string(), // "320g"
+      daysFromRoast: a.integer(), // days between roastDate and brewDate
 
       // Tasting notes
       tastingNotes: a.string(), // main journal entry (markdown supported)
       flavorNotes: a.string().array(), // ['blueberry', 'chocolate']
       rating: a.integer(), // 1-10
 
+      // Aroma
+      aroma: a.integer(), // dry aroma score 1-5
+      aromaNote: a.string(), // free text aroma description
+
       // Experience
       clarity: a.integer(), // 1-10
       body: a.integer(), // 1-10
       sweetness: a.integer(), // 1-10
       acidity: a.integer(), // 1-10
+      finish: a.integer(), // aftertaste score 1-5
+      florality: a.integer(), // floral/herbal score 1-5
+      bitterness: a.integer(), // bitterness score 1-5
+      finishNote: a.string(), // free text finish description
 
       // Metadata
       brewDate: a.datetime(),

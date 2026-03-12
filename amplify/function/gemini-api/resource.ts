@@ -4,7 +4,7 @@ export const geminiApi = defineFunction({
   name: "gemini-api",
   entry: "./handler.ts",
   runtime: 20,
-  timeoutSeconds: 30,
+  timeoutSeconds: 60,
   memoryMB: 512,
   environment: {
     GCP_PROJECT_ID: "deductive-jet-464913-p8",
