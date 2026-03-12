@@ -66,6 +66,15 @@ export interface ExtractedJournalFields {
   brewTime: string | null;
   flavorNotes: string[];
   tastingNotes: string | null;
+  spicy: number | null;
+  salty: number | null;
+  berryFruit: number | null;
+  citrusFruit: number | null;
+  stoneFruit: number | null;
+  chocolate: number | null;
+  caramel: number | null;
+  smoky: number | null;
+  savory: number | null;
   confidence: "high" | "medium" | "low";
 }
 
@@ -105,6 +114,15 @@ export async function extractJournalFieldsFromChat(
         brewTime: null,
         flavorNotes: [],
         tastingNotes: null,
+        spicy: null,
+        salty: null,
+        berryFruit: null,
+        citrusFruit: null,
+        stoneFruit: null,
+        chocolate: null,
+        caramel: null,
+        smoky: null,
+        savory: null,
         confidence: "low",
       },
     };

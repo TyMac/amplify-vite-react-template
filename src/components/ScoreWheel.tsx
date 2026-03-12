@@ -11,21 +11,43 @@ interface ScoreWheelProps {
   scores: {
     sweetness?: number;
     acidity?: number;
-    body?: number;
     florality?: number;
-    finish?: number;
+    spicy?: number;
+    salty?: number;
+    berryFruit?: number;
+    citrusFruit?: number;
+    stoneFruit?: number;
+    chocolate?: number;
+    caramel?: number;
+    smoky?: number;
     bitterness?: number;
+    savory?: number;
+    body?: number;
+    clarity?: number;
+    finish?: number;
   };
 }
 
 export default function ScoreWheel({ scores }: ScoreWheelProps) {
+  // 16 axes in clockwise order: Sweet, Acidic, Floral, Spicy, Salty, Berry Fruit,
+  // Citrus Fruit, Stone Fruit, Chocolate, Caramel, Smoky, Bitter, Savory, Body, Clean, Linger/Finish
   const data = [
-    { axis: "Sweetness", value: scores.sweetness ?? 0 },
-    { axis: "Acidity", value: scores.acidity ?? 0 },
+    { axis: "Sweet", value: scores.sweetness ?? 0 },
+    { axis: "Acidic", value: scores.acidity ?? 0 },
+    { axis: "Floral", value: scores.florality ?? 0 },
+    { axis: "Spicy", value: scores.spicy ?? 0 },
+    { axis: "Salty", value: scores.salty ?? 0 },
+    { axis: "Berry Fruit", value: scores.berryFruit ?? 0 },
+    { axis: "Citrus Fruit", value: scores.citrusFruit ?? 0 },
+    { axis: "Stone Fruit", value: scores.stoneFruit ?? 0 },
+    { axis: "Chocolate", value: scores.chocolate ?? 0 },
+    { axis: "Caramel", value: scores.caramel ?? 0 },
+    { axis: "Smoky", value: scores.smoky ?? 0 },
+    { axis: "Bitter", value: scores.bitterness ?? 0 },
+    { axis: "Savory", value: scores.savory ?? 0 },
     { axis: "Body", value: scores.body ?? 0 },
-    { axis: "Florality", value: scores.florality ?? 0 },
-    { axis: "Finish", value: scores.finish ?? 0 },
-    { axis: "Bitterness", value: scores.bitterness ?? 0 },
+    { axis: "Clean", value: scores.clarity ?? 0 },
+    { axis: "Linger/Finish", value: scores.finish ?? 0 },
   ];
 
   const hasAnyScore = Object.values(scores).some((v) => v !== undefined && v > 0);

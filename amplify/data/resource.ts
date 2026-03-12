@@ -267,6 +267,15 @@ const schema = a.schema({
       finish: a.integer(), // aftertaste score 1-5
       florality: a.integer(), // floral/herbal score 1-5
       bitterness: a.integer(), // bitterness score 1-5
+      spicy: a.integer(), // spicy/peppery notes 1-5
+      salty: a.integer(), // saltiness / mineral quality 1-5
+      berryFruit: a.integer(), // berry fruit notes 1-5
+      citrusFruit: a.integer(), // citrus fruit notes 1-5
+      stoneFruit: a.integer(), // stone fruit notes 1-5
+      chocolate: a.integer(), // chocolate notes 1-5
+      caramel: a.integer(), // caramel notes 1-5
+      smoky: a.integer(), // smoky notes 1-5
+      savory: a.integer(), // savory / umami notes 1-5
       finishNote: a.string(), // free text finish description
 
       // Metadata

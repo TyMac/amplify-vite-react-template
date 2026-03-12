@@ -301,6 +301,15 @@ async function extractJournalFields(args: { messages: string[] }) {
   "brewTime": string | null,          // e.g. "3:30"
   "flavorNotes": string[],            // array of flavor descriptors mentioned
   "tastingNotes": string | null,      // free text summary of tasting notes from the chat
+  "spicy": number | null,             // spicy/peppery intensity 1-5
+  "salty": number | null,             // saltiness/mineral quality 1-5
+  "berryFruit": number | null,        // berry fruit intensity 1-5
+  "citrusFruit": number | null,       // citrus fruit intensity 1-5
+  "stoneFruit": number | null,        // stone fruit intensity 1-5
+  "chocolate": number | null,         // chocolate notes 1-5
+  "caramel": number | null,           // caramel notes 1-5
+  "smoky": number | null,             // smoky intensity 1-5
+  "savory": number | null,            // savory/umami quality 1-5
   "confidence": "high" | "medium" | "low"  // how confident you are in the extraction
 }
 
@@ -368,6 +377,15 @@ Return ONLY the JSON object, no markdown, no explanation.`;
           brewTime: null,
           flavorNotes: [],
           tastingNotes: null,
+          spicy: null,
+          salty: null,
+          berryFruit: null,
+          citrusFruit: null,
+          stoneFruit: null,
+          chocolate: null,
+          caramel: null,
+          smoky: null,
+          savory: null,
           confidence: 'low',
         },
         tokensUsed: result.usageMetadata?.totalTokenCount || 0,

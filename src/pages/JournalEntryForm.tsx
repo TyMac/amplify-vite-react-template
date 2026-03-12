@@ -110,13 +110,23 @@ export default function JournalEntryForm({
   const [aroma, setAroma] = useState(3);
   const [aromaNote, setAromaNote] = useState("");
 
-  // Tasting scores (1-5)
+  // Tasting scores (1-5) - 16 axes
   const [sweetness, setSweetness] = useState(3);
   const [acidity, setAcidity] = useState(3);
-  const [body, setBody] = useState(3);
   const [florality, setFlorality] = useState(3);
-  const [finish, setFinish] = useState(3);
+  const [spicy, setSpicy] = useState(3);
+  const [salty, setSalty] = useState(3);
+  const [berryFruit, setBerryFruit] = useState(3);
+  const [citrusFruit, setCitrusFruit] = useState(3);
+  const [stoneFruit, setStoneFruit] = useState(3);
+  const [chocolate, setChocolate] = useState(3);
+  const [caramel, setCaramel] = useState(3);
+  const [smoky, setSmoky] = useState(3);
   const [bitterness, setBitterness] = useState(3);
+  const [savory, setSavory] = useState(3);
+  const [body, setBody] = useState(3);
+  const [clarity, setClarity] = useState(3);
+  const [finish, setFinish] = useState(3);
 
   // Flavor tags
   const [flavorNotes, setFlavorNotes] = useState<string[]>([]);
@@ -333,10 +343,20 @@ export default function JournalEntryForm({
         setAromaNote(data.aromaNote || "");
         setSweetness(data.sweetness ?? 3);
         setAcidity(data.acidity ?? 3);
-        setBody(data.body ?? 3);
         setFlorality(data.florality ?? 3);
-        setFinish(data.finish ?? 3);
+        setSpicy(data.spicy ?? 3);
+        setSalty(data.salty ?? 3);
+        setBerryFruit(data.berryFruit ?? 3);
+        setCitrusFruit(data.citrusFruit ?? 3);
+        setStoneFruit(data.stoneFruit ?? 3);
+        setChocolate(data.chocolate ?? 3);
+        setCaramel(data.caramel ?? 3);
+        setSmoky(data.smoky ?? 3);
         setBitterness(data.bitterness ?? 3);
+        setSavory(data.savory ?? 3);
+        setBody(data.body ?? 3);
+        setClarity(data.clarity ?? 3);
+        setFinish(data.finish ?? 3);
         setFlavorNotes((data.flavorNotes ?? []).filter((n): n is string => n !== null));
         setTastingNotes(data.tastingNotes || "");
         setFinishNote(data.finishNote || "");
@@ -424,10 +444,20 @@ export default function JournalEntryForm({
         aromaNote: aromaNote.trim() || null,
         sweetness,
         acidity,
-        body,
         florality,
-        finish,
+        spicy,
+        salty,
+        berryFruit,
+        citrusFruit,
+        stoneFruit,
+        chocolate,
+        caramel,
+        smoky,
         bitterness,
+        savory,
+        body,
+        clarity,
+        finish,
         flavorNotes,
         tastingNotes: tastingNotes.trim() || null,
         finishNote: finishNote.trim() || null,
@@ -774,19 +804,50 @@ export default function JournalEntryForm({
             <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
               Tasting Scores
             </h2>
-            <div className="grid grid-cols-2 gap-4">
+            {/* Row 1: Sweet through Stone Fruit */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
               {[
-                { label: "Sweetness", value: sweetness, setter: setSweetness },
-                { label: "Acidity", value: acidity, setter: setAcidity },
-                { label: "Body", value: body, setter: setBody },
-                { label: "Florality", value: florality, setter: setFlorality },
-                { label: "Finish", value: finish, setter: setFinish },
-                { label: "Bitterness", value: bitterness, setter: setBitterness },
+                { label: "Sweet", value: sweetness, setter: setSweetness },
+                { label: "Acidic", value: acidity, setter: setAcidity },
+                { label: "Floral", value: florality, setter: setFlorality },
+                { label: "Spicy", value: spicy, setter: setSpicy },
+                { label: "Salty", value: salty, setter: setSalty },
+                { label: "Berry Fruit", value: berryFruit, setter: setBerryFruit },
+                { label: "Citrus Fruit", value: citrusFruit, setter: setCitrusFruit },
+                { label: "Stone Fruit", value: stoneFruit, setter: setStoneFruit },
               ].map(({ label, value, setter }) => (
                 <div key={label}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm">{label}</span>
-                    <span className="text-sm font-medium">{value}/5</span>
+                    <span className="text-xs">{label}</span>
+                    <span className="text-xs font-medium">{value}/5</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={5}
+                    value={value}
+                    onChange={(e) => setter(Number(e.target.value))}
+                    className="range range-primary range-xs"
+                  />
+                </div>
+              ))}
+            </div>
+            {/* Row 2: Chocolate through Linger/Finish */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { label: "Chocolate", value: chocolate, setter: setChocolate },
+                { label: "Caramel", value: caramel, setter: setCaramel },
+                { label: "Smoky", value: smoky, setter: setSmoky },
+                { label: "Bitter", value: bitterness, setter: setBitterness },
+                { label: "Savory", value: savory, setter: setSavory },
+                { label: "Body", value: body, setter: setBody },
+                { label: "Clean", value: clarity, setter: setClarity },
+                { label: "Linger/Finish", value: finish, setter: setFinish },
+              ].map(({ label, value, setter }) => (
+                <div key={label}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs">{label}</span>
+                    <span className="text-xs font-medium">{value}/5</span>
                   </div>
                   <input
                     type="range"
@@ -801,7 +862,24 @@ export default function JournalEntryForm({
             </div>
             <div className="mt-4">
               <ScoreWheel
-                scores={{ sweetness, acidity, body, florality, finish, bitterness }}
+                scores={{
+                  sweetness,
+                  acidity,
+                  florality,
+                  spicy,
+                  salty,
+                  berryFruit,
+                  citrusFruit,
+                  stoneFruit,
+                  chocolate,
+                  caramel,
+                  smoky,
+                  bitterness,
+                  savory,
+                  body,
+                  clarity,
+                  finish,
+                }}
               />
             </div>
           </div>

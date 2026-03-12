@@ -88,10 +88,20 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
   const scores = {
     sweetness: entry.sweetness ?? undefined,
     acidity: entry.acidity ?? undefined,
-    body: entry.body ?? undefined,
     florality: entry.florality ?? undefined,
-    finish: entry.finish ?? undefined,
+    spicy: entry.spicy ?? undefined,
+    salty: entry.salty ?? undefined,
+    berryFruit: entry.berryFruit ?? undefined,
+    citrusFruit: entry.citrusFruit ?? undefined,
+    stoneFruit: entry.stoneFruit ?? undefined,
+    chocolate: entry.chocolate ?? undefined,
+    caramel: entry.caramel ?? undefined,
+    smoky: entry.smoky ?? undefined,
     bitterness: entry.bitterness ?? undefined,
+    savory: entry.savory ?? undefined,
+    body: entry.body ?? undefined,
+    clarity: entry.clarity ?? undefined,
+    finish: entry.finish ?? undefined,
   };
 
   const renderStars = (rating: number) => {
