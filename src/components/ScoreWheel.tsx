@@ -61,8 +61,15 @@ export default function ScoreWheel({ scores }: ScoreWheelProps) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={250}>
-      <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
+    <ResponsiveContainer width="100%" height={420}>
+      <RadarChart cx="50%" cy="50%" outerRadius="75%" data={data}>
+        <defs>
+          <radialGradient id="radarFill" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.85} />
+            <stop offset="60%" stopColor="#f97316" stopOpacity={0.7} />
+            <stop offset="100%" stopColor="#ef4444" stopOpacity={0.5} />
+          </radialGradient>
+        </defs>
         <PolarGrid stroke="currentColor" className="text-base-content/20" />
         <PolarAngleAxis
           dataKey="axis"
@@ -79,9 +86,9 @@ export default function ScoreWheel({ scores }: ScoreWheelProps) {
         <Radar
           name="Scores"
           dataKey="value"
-          stroke="oklch(var(--p))"
-          fill="oklch(var(--p))"
-          fillOpacity={0.4}
+          stroke="#f97316"
+          fill="url(#radarFill)"
+          fillOpacity={1}
           strokeWidth={2}
         />
       </RadarChart>

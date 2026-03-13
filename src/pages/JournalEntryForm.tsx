@@ -804,83 +804,53 @@ export default function JournalEntryForm({
             <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
               Tasting Scores
             </h2>
-            {/* Row 1: Sweet through Stone Fruit */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-              {[
-                { label: "Sweet", value: sweetness, setter: setSweetness },
-                { label: "Acidic", value: acidity, setter: setAcidity },
-                { label: "Floral", value: florality, setter: setFlorality },
-                { label: "Spicy", value: spicy, setter: setSpicy },
-                { label: "Salty", value: salty, setter: setSalty },
-                { label: "Berry Fruit", value: berryFruit, setter: setBerryFruit },
-                { label: "Citrus Fruit", value: citrusFruit, setter: setCitrusFruit },
-                { label: "Stone Fruit", value: stoneFruit, setter: setStoneFruit },
-              ].map(({ label, value, setter }) => (
-                <div key={label}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs">{label}</span>
-                    <span className="text-xs font-medium">{value}/5</span>
+            <div className="flex flex-col lg:flex-row gap-6">
+              {/* Left: all 16 sliders */}
+              <div className="flex flex-col gap-3 lg:w-64 shrink-0">
+                {[
+                  { label: "Sweet", value: sweetness, setter: setSweetness },
+                  { label: "Acidic", value: acidity, setter: setAcidity },
+                  { label: "Floral", value: florality, setter: setFlorality },
+                  { label: "Spicy", value: spicy, setter: setSpicy },
+                  { label: "Salty", value: salty, setter: setSalty },
+                  { label: "Berry Fruit", value: berryFruit, setter: setBerryFruit },
+                  { label: "Citrus Fruit", value: citrusFruit, setter: setCitrusFruit },
+                  { label: "Stone Fruit", value: stoneFruit, setter: setStoneFruit },
+                  { label: "Chocolate", value: chocolate, setter: setChocolate },
+                  { label: "Caramel", value: caramel, setter: setCaramel },
+                  { label: "Smoky", value: smoky, setter: setSmoky },
+                  { label: "Bitter", value: bitterness, setter: setBitterness },
+                  { label: "Savory", value: savory, setter: setSavory },
+                  { label: "Body", value: body, setter: setBody },
+                  { label: "Clean", value: clarity, setter: setClarity },
+                  { label: "Linger/Finish", value: finish, setter: setFinish },
+                ].map(({ label, value, setter }) => (
+                  <div key={label}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs">{label}</span>
+                      <span className="text-xs font-medium tabular-nums">{value}/5</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={value}
+                      onChange={(e) => setter(Number(e.target.value))}
+                      className="range range-primary range-xs w-full"
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={5}
-                    value={value}
-                    onChange={(e) => setter(Number(e.target.value))}
-                    className="range range-primary range-xs"
-                  />
-                </div>
-              ))}
-            </div>
-            {/* Row 2: Chocolate through Linger/Finish */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { label: "Chocolate", value: chocolate, setter: setChocolate },
-                { label: "Caramel", value: caramel, setter: setCaramel },
-                { label: "Smoky", value: smoky, setter: setSmoky },
-                { label: "Bitter", value: bitterness, setter: setBitterness },
-                { label: "Savory", value: savory, setter: setSavory },
-                { label: "Body", value: body, setter: setBody },
-                { label: "Clean", value: clarity, setter: setClarity },
-                { label: "Linger/Finish", value: finish, setter: setFinish },
-              ].map(({ label, value, setter }) => (
-                <div key={label}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs">{label}</span>
-                    <span className="text-xs font-medium">{value}/5</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={5}
-                    value={value}
-                    onChange={(e) => setter(Number(e.target.value))}
-                    className="range range-primary range-xs"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="mt-4">
-              <ScoreWheel
-                scores={{
-                  sweetness,
-                  acidity,
-                  florality,
-                  spicy,
-                  salty,
-                  berryFruit,
-                  citrusFruit,
-                  stoneFruit,
-                  chocolate,
-                  caramel,
-                  smoky,
-                  bitterness,
-                  savory,
-                  body,
-                  clarity,
-                  finish,
-                }}
-              />
+                ))}
+              </div>
+              {/* Right: live radar chart */}
+              <div className="flex-1 min-h-[420px]">
+                <ScoreWheel
+                  scores={{
+                    sweetness, acidity, florality, spicy, salty,
+                    berryFruit, citrusFruit, stoneFruit, chocolate, caramel,
+                    smoky, bitterness, savory, body, clarity, finish,
+                  }}
+                />
+              </div>
             </div>
           </div>
         </section>

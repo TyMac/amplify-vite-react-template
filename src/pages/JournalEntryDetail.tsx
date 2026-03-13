@@ -233,7 +233,9 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
           <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
             Tasting Profile
           </h2>
-          <ScoreWheel scores={scores} />
+          <div className="min-h-[420px]">
+            <ScoreWheel scores={scores} />
+          </div>
         </div>
       </div>
 
