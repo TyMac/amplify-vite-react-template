@@ -364,7 +364,7 @@ export default function JournalPage() {
       </div>
 
       {/* Right Pane - Timeline */}
-      <div className="hidden lg:flex flex-col w-72 border-l border-base-200 bg-base-100">
+      <div className="hidden lg:flex flex-col w-96 border-l border-base-200 bg-base-100">
         <div className="p-3 border-b border-base-200 flex items-center justify-between">
           <h2 className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">
             Timeline
@@ -410,22 +410,22 @@ export default function JournalPage() {
                     <button
                       key={entry.id}
                       onClick={() => handleEntryClick(entry.id)}
-                      className={`badge badge-primary gap-1 cursor-pointer hover:badge-primary/80 ${
-                        selectedEntryId === entry.id ? "ring-2 ring-primary ring-offset-1" : ""
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-primary text-primary bg-transparent hover:bg-primary/10 transition-colors w-full text-left ${
+                        selectedEntryId === entry.id ? "bg-primary/15 ring-1 ring-primary" : ""
                       }`}
                     >
                       <span>☕</span>
-                      <span className="truncate max-w-[140px]">{entry.coffeeName}</span>
+                      <span className="truncate">{entry.coffeeName}</span>
                     </button>
                   ))}
                   {pinnedChats.map(({ chat }) => (
                     <Link
                       key={chat.id}
                       to={`/chat/${chat.id}`}
-                      className="badge badge-secondary gap-1 cursor-pointer hover:badge-secondary/80"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-secondary text-secondary bg-transparent hover:bg-secondary/10 transition-colors w-full"
                     >
                       <span>💬</span>
-                      <span className="truncate max-w-[140px]">{chat.name}</span>
+                      <span className="truncate">{chat.name}</span>
                     </Link>
                   ))}
                 </div>
