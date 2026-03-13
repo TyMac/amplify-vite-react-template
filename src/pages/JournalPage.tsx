@@ -42,8 +42,11 @@ export default function JournalPage() {
   const [loading, setLoading] = useState(true);
 
   // State management for 3-pane layout
+  const STORAGE_KEY = "journal_last_entry";
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(() => {
+    try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
+  });
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
   // Pre-linked chat from query param
@@ -53,6 +56,24 @@ export default function JournalPage() {
     loadEntries();
     loadChatSessions();
   }, [user]);
+
+  // Persist last opened entry to localStorage
+  useEffect(() => {
+    try {
+      if (selectedEntryId) localStorage.setItem(STORAGE_KEY, selectedEntryId);
+      else localStorage.removeItem(STORAGE_KEY);
+    } catch {}
+  }, [selectedEntryId]);
+
+  // When entries load, restore selectedDate for the persisted entry
+  useEffect(() => {
+    if (selectedEntryId && entries.length > 0 && !selectedDate) {
+      const entry = entries.find((e) => e.id === selectedEntryId);
+      if (entry?.brewDate) {
+        setSelectedDate(entry.brewDate.split("T")[0]);
+      }
+    }
+  }, [entries, selectedEntryId]);
 
   // Handle pre-linked chat from URL
   useEffect(() => {

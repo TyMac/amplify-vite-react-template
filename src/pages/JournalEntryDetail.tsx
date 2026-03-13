@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import ScoreWheel from "../components/ScoreWheel";
+import { TagChip } from "../components/tags";
 
 const client = generateClient<Schema>();
 
@@ -208,19 +209,15 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
             )}
           </div>
           {(entry.variety || entry.processing || entry.roastLevel) && (
-            <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-base-200">
+            <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-base-200">
               {entry.variety && (
-                <span className="badge badge-ghost badge-sm">{entry.variety}</span>
+                <TagChip tag={entry.variety} />
               )}
               {entry.processing && (
-                <span className="badge badge-ghost badge-sm">
-                  {entry.processing.replace("_", " ")}
-                </span>
+                <TagChip tag={entry.processing.replace(/_/g, " ")} />
               )}
               {entry.roastLevel && (
-                <span className="badge badge-ghost badge-sm">
-                  {entry.roastLevel.replace("_", " ")}
-                </span>
+                <TagChip tag={entry.roastLevel.replace(/_/g, " ")} />
               )}
             </div>
           )}
@@ -247,10 +244,8 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
               Flavor Notes
             </h2>
             <div className="flex flex-wrap gap-1.5">
-              {entry.flavorNotes.map((tag) => (
-                <span key={tag} className="badge badge-outline">
-                  {tag}
-                </span>
+              {entry.flavorNotes.map((tag) => tag && (
+                <TagChip key={tag} tag={tag} />
               ))}
             </div>
           </div>
