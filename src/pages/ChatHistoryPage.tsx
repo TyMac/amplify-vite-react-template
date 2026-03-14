@@ -1,25 +1,11 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { generateClient } from "aws-amplify/data";
-import type { Schema } from "../../amplify/data/resource";
 import {
   chatStorage,
   type ChatMessage,
   type ChatSession,
 } from "../services/chatStorage";
 import { TagChip, TagEditor } from "../components/tags";
-
-const searchClient = generateClient<Schema>({ authMode: "userPool" });
-
-function parseMessages(raw: unknown): ChatMessage[] {
-  try {
-    if (typeof raw === "string") return JSON.parse(raw);
-    if (Array.isArray(raw)) return raw as ChatMessage[];
-    return [];
-  } catch {
-    return [];
-  }
-}
 
 function ChatHistoryPage() {
   const navigate = useNavigate();
@@ -69,26 +55,28 @@ function ChatHistoryPage() {
 
     setIsSearching(true);
     try {
-      const { data, errors } = await searchClient.queries.searchChats({
-        content: hasQuery ? query : undefined,
-        tags: hasTags ? tags : undefined,
+      const allSessions = await chatStorage.getSessions();
+      const queryLower = query.trim().toLowerCase();
+
+      const results = allSessions.filter((session) => {
+        // Tag filter: session must have ALL active tags
+        if (hasTags) {
+          const sessionTags = session.tags ?? [];
+          const hasAllTags = tags.every((tag) => sessionTags.includes(tag));
+          if (!hasAllTags) return false;
+        }
+
+        // Query filter: match name or any message content
+        if (hasQuery) {
+          const nameMatch = session.name.toLowerCase().includes(queryLower);
+          const messageMatch = session.messages.some((msg) =>
+            msg.content.toLowerCase().includes(queryLower)
+          );
+          if (!nameMatch && !messageMatch) return false;
+        }
+
+        return true;
       });
-
-      if (errors) {
-        console.error("OpenSearch error:", errors);
-        return;
-      }
-
-      const results = ((data ?? []) as unknown as Schema["ChatSession"]["type"][]).map(
-        (item) => ({
-          id: item.id,
-          name: item.name,
-          messages: parseMessages(item.messages),
-          tags: (item.tags as string[] | null | undefined) ?? [],
-          createdAt: item.createdAt || new Date().toISOString(),
-          updatedAt: item.updatedAt || new Date().toISOString(),
-        })
-      );
 
       setSessions(results);
       setIsSearchActive(true);
@@ -345,9 +333,9 @@ function ChatHistoryPage() {
       {isSearchActive && (
         <p className="text-xs text-base-content/40 mb-3">
           {searchQuery.trim() && activeTags.length > 0
-            ? `OpenSearch results for "${searchQuery}" tagged [${activeTags.join(", ")}]`
+            ? `Results for "${searchQuery}" tagged [${activeTags.join(", ")}]`
             : searchQuery.trim()
-            ? `OpenSearch results for "${searchQuery}"`
+            ? `Results for "${searchQuery}"`
             : `Filtered by tag${activeTags.length > 1 ? "s" : ""}: [${activeTags.join(", ")}]`}
         </p>
       )}

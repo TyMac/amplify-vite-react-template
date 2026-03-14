@@ -291,24 +291,6 @@ const schema = a.schema({
     ]),
 
   // ============================================
-  // OPENSEARCH - Zero-ETL chat history search
-  // ============================================
-  searchChats: a
-    .query()
-    .arguments({
-      content: a.string(),
-      tags: a.string().array(),
-    })
-    .returns(a.ref("ChatSession").array())
-    .authorization((allow) => [allow.authenticated()])
-    .handler(
-      a.handler.custom({
-        entry: "./searchChatResolver.js",
-        dataSource: "OpenSearchServerlessDataSource",
-      }),
-    ),
-
-  // ============================================
   // GEMINI AI - Custom queries via Lambda
   // ============================================
   geminiChat: a
