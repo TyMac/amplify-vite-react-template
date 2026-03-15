@@ -1,5 +1,7 @@
 import { Authenticator } from "@aws-amplify/ui-react";
 import "@aws-amplify/ui-react/styles.css";
+import { useEffect, useState } from "react";
+import { fetchUserAttributes } from "aws-amplify/auth";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import ThemeToggle from "./components/ThemeToggle";
@@ -12,6 +14,17 @@ import "./App.css";
 
 function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () => void }) {
   const location = useLocation();
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    fetchUserAttributes()
+      .then((attrs) => setEmail(attrs.email ?? null))
+      .catch(() => setEmail(null));
+  }, [user]);
+
+  const displayName = email ?? user?.username ?? "";
+  const initial = displayName.charAt(0).toUpperCase();
 
   const navLinks = [
     { to: "/", label: "Home", active: location.pathname === "/" },
@@ -42,18 +55,28 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
       </div>
 
       {/* Desktop right side */}
-      <div className="hidden sm:flex flex-1 justify-end gap-2">
+      <div className="hidden sm:flex flex-1 justify-end items-center gap-2">
         <ThemeToggle />
         {user && (
           <div className="dropdown dropdown-end">
             <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar placeholder">
               <div className="bg-primary text-primary-content rounded-full w-8">
-                <span className="text-xs">{user.username?.charAt(0).toUpperCase()}</span>
+                <span className="text-xs font-semibold">{initial}</span>
               </div>
             </div>
-            <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow-lg border border-base-200">
-              <li className="menu-title text-xs opacity-60 px-2">{user.username}</li>
-              <li><button onClick={signOut} className="text-error">Sign out</button></li>
+            <ul tabIndex={0} className="dropdown-content bg-base-100 rounded-box z-10 w-64 p-2 shadow-lg border border-base-200 mt-1">
+              <li className="px-3 py-2 border-b border-base-200 mb-1">
+                <p className="text-xs text-base-content/50 leading-none mb-0.5">Signed in as</p>
+                <p className="text-sm font-medium truncate">{displayName}</p>
+              </li>
+              <li>
+                <button
+                  onClick={signOut}
+                  className="w-full text-left px-3 py-2 text-sm text-error hover:bg-base-200 rounded-lg transition-colors"
+                >
+                  Sign out
+                </button>
+              </li>
             </ul>
           </div>
         )}
@@ -68,16 +91,28 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </div>
-          <ul tabIndex={0} className="dropdown-content menu bg-base-100 rounded-box z-10 w-48 p-2 shadow-lg border border-base-200">
+          <ul tabIndex={0} className="dropdown-content bg-base-100 rounded-box z-10 w-56 p-2 shadow-lg border border-base-200 mt-1">
             {navLinks.map(({ to, label, active }) => (
               <li key={to}>
-                <Link to={to} className={active ? "text-primary font-medium" : ""}>{label}</Link>
+                <Link to={to} className={`block px-3 py-2 text-sm rounded-lg hover:bg-base-200 transition-colors ${active ? "text-primary font-medium" : ""}`}>{label}</Link>
               </li>
             ))}
             {user && (
               <>
-                <li className="menu-title text-xs opacity-60 px-2 pt-2">{user.username}</li>
-                <li><button onClick={signOut} className="text-error">Sign out</button></li>
+                <li className="border-t border-base-200 mt-1 pt-1">
+                  <div className="px-3 py-2">
+                    <p className="text-xs text-base-content/50 leading-none mb-0.5">Signed in as</p>
+                    <p className="text-sm font-medium truncate">{displayName}</p>
+                  </div>
+                </li>
+                <li>
+                  <button
+                    onClick={signOut}
+                    className="w-full text-left px-3 py-2 text-sm text-error hover:bg-base-200 rounded-lg transition-colors"
+                  >
+                    Sign out
+                  </button>
+                </li>
               </>
             )}
           </ul>
