@@ -232,6 +232,7 @@ const schema = a.schema({
       origin: a.string(),
       variety: a.string(), // bean variety e.g. gesha, bourbon
       processing: a.enum(["WASHED", "NATURAL", "HONEY", "ANAEROBIC", "OTHER"]),
+      processingNote: a.string(), // notes on how processing affected the cup
       roastLevel: a.enum([
         "LIGHT",
         "MEDIUM_LIGHT",
@@ -239,6 +240,7 @@ const schema = a.schema({
         "MEDIUM_DARK",
         "DARK",
       ]),
+      roastLevelNote: a.string(), // notes on how roast level affected the cup
 
       // Brew details
       brewMethod: a.string(),

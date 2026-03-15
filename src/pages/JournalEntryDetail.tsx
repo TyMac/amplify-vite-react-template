@@ -209,15 +209,23 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
             )}
           </div>
           {(entry.variety || entry.processing || entry.roastLevel) && (
-            <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-base-200">
-              {entry.variety && (
-                <TagChip tag={entry.variety} />
+            <div className="mt-3 pt-3 border-t border-base-200 space-y-2">
+              <div className="flex flex-wrap gap-1.5">
+                {entry.variety && <TagChip tag={entry.variety} />}
+                {entry.processing && <TagChip tag={entry.processing.replace(/_/g, " ")} />}
+                {entry.roastLevel && <TagChip tag={entry.roastLevel.replace(/_/g, " ")} />}
+              </div>
+              {entry.processingNote && (
+                <div>
+                  <p className="text-xs text-base-content/50 uppercase tracking-wider mb-0.5">Processing Notes</p>
+                  <p className="text-sm text-base-content/80">{entry.processingNote}</p>
+                </div>
               )}
-              {entry.processing && (
-                <TagChip tag={entry.processing.replace(/_/g, " ")} />
-              )}
-              {entry.roastLevel && (
-                <TagChip tag={entry.roastLevel.replace(/_/g, " ")} />
+              {entry.roastLevelNote && (
+                <div>
+                  <p className="text-xs text-base-content/50 uppercase tracking-wider mb-0.5">Roast Level Notes</p>
+                  <p className="text-sm text-base-content/80">{entry.roastLevelNote}</p>
+                </div>
               )}
             </div>
           )}

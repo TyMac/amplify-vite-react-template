@@ -91,7 +91,9 @@ export default function JournalEntryForm({
   const [origin, setOrigin] = useState("");
   const [variety, setVariety] = useState("");
   const [processing, setProcessing] = useState<BrewJournalInput["processing"]>(null);
+  const [processingNote, setProcessingNote] = useState("");
   const [roastLevel, setRoastLevel] = useState<BrewJournalInput["roastLevel"]>(null);
+  const [roastLevelNote, setRoastLevelNote] = useState("");
   const [roastDate, setRoastDate] = useState<string | null>(null);
 
   // Brew details
@@ -329,7 +331,9 @@ export default function JournalEntryForm({
         setOrigin(data.origin || "");
         setVariety(data.variety || "");
         setProcessing(data.processing || null);
+        setProcessingNote(data.processingNote || "");
         setRoastLevel(data.roastLevel || null);
+        setRoastLevelNote(data.roastLevelNote || "");
         setRoastDate(data.roastDate || null);
         setBrewDate(data.brewDate ? toISODateString(new Date(data.brewDate)) : toISODateString(new Date()));
         setBrewMethod(data.brewMethod || "");
@@ -430,7 +434,9 @@ export default function JournalEntryForm({
         origin: origin.trim() || null,
         variety: variety.trim() || null,
         processing,
+        processingNote: processingNote.trim() || null,
         roastLevel,
+        roastLevelNote: roastLevelNote.trim() || null,
         roastDate: roastDate || null,
         brewDate: brewDate ? new Date(brewDate).toISOString() : null,
         brewMethod: brewMethod || null,
@@ -606,6 +612,13 @@ export default function JournalEntryForm({
                       </option>
                     ))}
                   </select>
+                  <textarea
+                    value={processingNote}
+                    onChange={(e) => setProcessingNote(e.target.value)}
+                    className="textarea textarea-bordered w-full mt-2 text-sm"
+                    rows={2}
+                    placeholder="How did the processing affect the cup? (ferment notes, fruit clarity, sweetness...)"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -625,6 +638,13 @@ export default function JournalEntryForm({
                       </option>
                     ))}
                   </select>
+                  <textarea
+                    value={roastLevelNote}
+                    onChange={(e) => setRoastLevelNote(e.target.value)}
+                    className="textarea textarea-bordered w-full mt-2 text-sm"
+                    rows={2}
+                    placeholder="How did the roast level affect the cup? (brightness, body, development...)"
+                  />
                 </div>
                 <div>
                   <label className="label py-1">
