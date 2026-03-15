@@ -107,6 +107,9 @@ export default function JournalEntryForm({
   const [yieldAmount, setYieldAmount] = useState("");
   const [brewTime, setBrewTime] = useState("");
   const [daysFromRoastManual, setDaysFromRoastManual] = useState<number | null>(null);
+  const [tds, setTds] = useState<number | null>(null);
+  const [extractionYield, setExtractionYield] = useState<number | null>(null);
+  const [extractionNote, setExtractionNote] = useState("");
 
   // Aroma
   const [aroma, setAroma] = useState(3);
@@ -343,6 +346,9 @@ export default function JournalEntryForm({
         setYieldAmount(data.yield || "");
         setBrewTime(data.brewTime || "");
         setDaysFromRoastManual(data.daysFromRoast ?? null);
+        setTds(data.tds ?? null);
+        setExtractionYield(data.extractionYield ?? null);
+        setExtractionNote(data.extractionNote || "");
         setAroma(data.aroma ?? 3);
         setAromaNote(data.aromaNote || "");
         setSweetness(data.sweetness ?? 3);
@@ -446,6 +452,9 @@ export default function JournalEntryForm({
         yield: yieldAmount.trim() || null,
         brewTime: brewTime.trim() || null,
         daysFromRoast,
+        tds: tds ?? null,
+        extractionYield: extractionYield ?? null,
+        extractionNote: extractionNote.trim() || null,
         aroma,
         aromaNote: aromaNote.trim() || null,
         sweetness,
@@ -776,6 +785,50 @@ export default function JournalEntryForm({
                     disabled={Boolean(roastDate && brewDate)}
                   />
                 </div>
+              </div>
+
+              {/* Extraction subsection */}
+              <div className="pt-3 mt-1 border-t border-base-200">
+                <p className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-2">Extraction</p>
+                <div className="grid grid-cols-2 gap-3 mb-2">
+                  <div>
+                    <label className="label py-1">
+                      <span className="label-text text-sm">TDS (%)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="5"
+                      value={tds ?? ""}
+                      onChange={(e) => setTds(e.target.value ? Number(e.target.value) : null)}
+                      className="input input-bordered w-full"
+                      placeholder="1.35"
+                    />
+                  </div>
+                  <div>
+                    <label className="label py-1">
+                      <span className="label-text text-sm">Extraction Yield (%)</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="30"
+                      value={extractionYield ?? ""}
+                      onChange={(e) => setExtractionYield(e.target.value ? Number(e.target.value) : null)}
+                      className="input input-bordered w-full"
+                      placeholder="20.5"
+                    />
+                  </div>
+                </div>
+                <textarea
+                  value={extractionNote}
+                  onChange={(e) => setExtractionNote(e.target.value)}
+                  className="textarea textarea-bordered w-full text-sm"
+                  rows={2}
+                  placeholder="Extraction observations — channeling, flow rate, color break, any adjustments made..."
+                />
               </div>
             </div>
           </div>

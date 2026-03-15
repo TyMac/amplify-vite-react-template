@@ -252,6 +252,11 @@ const schema = a.schema({
       yield: a.string(), // "320g"
       daysFromRoast: a.integer(), // days between roastDate and brewDate
 
+      // Extraction metrics
+      tds: a.float(), // Total Dissolved Solids (%) e.g. 1.35
+      extractionYield: a.float(), // Extraction yield (%) e.g. 20.1
+      extractionNote: a.string(), // free-text observations on extraction
+
       // Tasting notes
       tastingNotes: a.string(), // main journal entry (markdown supported)
       flavorNotes: a.string().array(), // ['blueberry', 'chocolate']

@@ -208,6 +208,28 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
               </div>
             )}
           </div>
+          {(entry.tds != null || entry.extractionYield != null || entry.extractionNote) && (
+            <div className="mt-3 pt-3 border-t border-base-200 space-y-1.5">
+              <p className="text-xs font-semibold tracking-widest text-base-content/50 uppercase">Extraction</p>
+              <div className="flex flex-wrap gap-4 text-sm">
+                {entry.tds != null && (
+                  <div>
+                    <span className="text-base-content/50">TDS:</span>{" "}
+                    <span className="font-medium">{entry.tds}%</span>
+                  </div>
+                )}
+                {entry.extractionYield != null && (
+                  <div>
+                    <span className="text-base-content/50">Yield:</span>{" "}
+                    <span className="font-medium">{entry.extractionYield}%</span>
+                  </div>
+                )}
+              </div>
+              {entry.extractionNote && (
+                <p className="text-sm text-base-content/80">{entry.extractionNote}</p>
+              )}
+            </div>
+          )}
           {(entry.variety || entry.processing || entry.roastLevel) && (
             <div className="mt-3 pt-3 border-t border-base-200 space-y-2">
               <div className="flex flex-wrap gap-1.5">
