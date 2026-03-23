@@ -7,6 +7,7 @@ import FlavorWheelPicker from "../components/FlavorWheelPicker";
 import ScoreWheel from "../components/ScoreWheel";
 import { extractJournalFieldsFromChat } from "../services/gemini";
 import { TAG_SUGGESTIONS } from "../components/tags";
+import { upsertBatch, findBatch } from "../services/coffeeBatch";
 
 const client = generateClient<Schema>();
 
@@ -76,12 +77,15 @@ export default function JournalEntryForm({
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const chatIdFromUrl = searchParams.get("chatId");
+  const batchIdFromUrl = searchParams.get("batchId");
   const navigate = useNavigate();
   const { user } = useAuthenticator();
   const isEdit = Boolean(id);
 
   const [loading, setLoading] = useState(isEdit);
   const [autoFilling, setAutoFilling] = useState(false);
+  const [existingBatch, setExistingBatch] = useState<Schema["CoffeeBatch"]["type"] | null>(null);
+  const [existingBatchBrewCount, setExistingBatchBrewCount] = useState<number>(0);
   const [autoFilledFields, setAutoFilledFields] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
@@ -175,6 +179,49 @@ export default function JournalEntryForm({
       setSelectedChatIds((prev) => [...prev, preLinkedChatId]);
     }
   }, [preLinkedChatId]);
+
+  // Pre-populate coffee fields from batchId URL param (e.g. "+ Brew" from batch detail)
+  useEffect(() => {
+    if (!batchIdFromUrl || isEdit) return;
+    (async () => {
+      const { data: batch } = await client.models.CoffeeBatch.get({ id: batchIdFromUrl });
+      if (!batch) return;
+      setCoffeeName(batch.coffeeName);
+      setRoaster(batch.roaster ?? "");
+      setOrigin(batch.origin ?? "");
+      setVariety(batch.variety ?? "");
+      setProcessing(batch.processing ?? null);
+      setProcessingNote(batch.processingNote ?? "");
+      setRoastLevel(batch.roastLevel ?? null);
+      setRoastLevelNote(batch.roastLevelNote ?? "");
+      setRoastDate(batch.roastDate ?? null);
+    })();
+  }, [batchIdFromUrl, isEdit]);
+
+  // Batch lookup — triggers when the three identifying fields are all set
+  useEffect(() => {
+    if (!user?.userId || !coffeeName.trim() || !roastDate) {
+      setExistingBatch(null);
+      setExistingBatchBrewCount(0);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const batch = await findBatch(user.userId, coffeeName.trim(), roaster, roastDate);
+      if (cancelled) return;
+      setExistingBatch(batch);
+      if (batch) {
+        // Count how many brews already exist for this batch
+        const { data } = await client.models.BrewJournal.list({
+          filter: { coffeeBatchId: { eq: batch.id } },
+        });
+        if (!cancelled) setExistingBatchBrewCount(data?.length ?? 0);
+      } else {
+        setExistingBatchBrewCount(0);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [coffeeName, roaster, roastDate, user?.userId]);
 
   // Auto-fill from chat when chatId is present in URL
   useEffect(() => {
@@ -432,8 +479,24 @@ export default function JournalEntryForm({
 
     setSaving(true);
     try {
+      // Upsert the coffee batch (creates if new, returns existing id if found)
+      const coffeeBatchId = user?.userId
+        ? await upsertBatch(user.userId, {
+            coffeeName: coffeeName.trim(),
+            roaster: roaster.trim() || null,
+            roastDate: roastDate || null,
+            origin: origin.trim() || null,
+            variety: variety.trim() || null,
+            processing: processing ?? undefined,
+            processingNote: processingNote.trim() || null,
+            roastLevel: roastLevel ?? undefined,
+            roastLevelNote: roastLevelNote.trim() || null,
+          })
+        : null;
+
       const entryData: BrewJournalInput = {
         userId: user?.userId || null,
+        coffeeBatchId: coffeeBatchId ?? null,
         chatSessionIds: selectedChatIds,
         coffeeName: coffeeName.trim(),
         roaster: roaster.trim() || null,
@@ -668,6 +731,25 @@ export default function JournalEntryForm({
                 </div>
               </div>
             </div>
+
+            {/* Batch context banner */}
+            {coffeeName.trim() && roastDate && (
+              <div
+                className={`mt-3 rounded-lg px-4 py-3 text-sm flex items-center gap-2 border ${
+                  existingBatch
+                    ? "border-success/40 bg-success/5 text-success"
+                    : "border-base-300 bg-base-200 text-base-content/60"
+                }`}
+              >
+                <span
+                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: existingBatch?.color ?? "#9ca3af" }}
+                />
+                {existingBatch
+                  ? `Brew #${existingBatchBrewCount + 1} for this batch — ${existingBatch.coffeeName}${existingBatch.roaster ? ` by ${existingBatch.roaster}` : ""}`
+                  : "New batch — a coffee batch will be created when you save"}
+              </div>
+            )}
           </div>
         </section>
 

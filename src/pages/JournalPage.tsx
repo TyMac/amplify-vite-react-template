@@ -6,6 +6,7 @@ import type { Schema } from "../../amplify/data/resource";
 import JournalEntryDetail from "./JournalEntryDetail";
 import JournalEntryForm from "./JournalEntryForm";
 import { useTimezone } from "../contexts/TimezoneContext";
+import { batchColor } from "../services/coffeeBatch";
 
 const client = generateClient<Schema>();
 
@@ -435,18 +436,32 @@ export default function JournalPage() {
                   {formatShortDate(dateKey, timezone)}
                 </p>
                 <div className="flex flex-col gap-1">
-                  {dayEntries.map((entry) => (
-                    <button
-                      key={entry.id}
-                      onClick={() => handleEntryClick(entry.id)}
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-primary text-primary bg-transparent hover:bg-primary/10 transition-colors w-full text-left ${
-                        selectedEntryId === entry.id ? "bg-primary/15 ring-1 ring-primary" : ""
-                      }`}
-                    >
-                      <span>☕</span>
-                      <span className="truncate">{entry.coffeeName}</span>
-                    </button>
-                  ))}
+                  {dayEntries.map((entry) => {
+                    const color = entry.coffeeBatchId
+                      ? batchColor(entry.coffeeBatchId)
+                      : "#6b7280";
+                    const isSelected = selectedEntryId === entry.id;
+                    return (
+                      <button
+                        key={entry.id}
+                        onClick={() => handleEntryClick(entry.id)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border transition-colors w-full text-left ${
+                          isSelected ? "ring-1" : "bg-transparent hover:bg-base-200"
+                        }`}
+                        style={{
+                          borderColor: color,
+                          color: color,
+                          ...(isSelected ? { backgroundColor: color + "22", ringColor: color } : {}),
+                        }}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="truncate">{entry.coffeeName}</span>
+                      </button>
+                    );
+                  })}
                   {pinnedChats.map(({ chat }) => (
                     <Link
                       key={chat.id}

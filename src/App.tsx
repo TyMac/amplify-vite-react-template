@@ -12,6 +12,7 @@ import JournalPage from "./pages/JournalPage";
 import JournalEntryForm from "./pages/JournalEntryForm";
 import JournalEntryDetail from "./pages/JournalEntryDetail";
 import ProfilePage from "./pages/ProfilePage";
+import CoffeeBatchPage from "./pages/CoffeeBatchPage";
 import "./App.css";
 
 function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () => void }) {
@@ -31,6 +32,7 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
   const navLinks = [
     { to: "/", label: "Home", active: location.pathname === "/" },
     { to: "/chat", label: "Coffee Talk", active: location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") },
+    { to: "/batches", label: "Batches", active: location.pathname.startsWith("/batches") },
     { to: "/journal", label: "Journal", active: location.pathname.startsWith("/journal") },
     { to: "/chats", label: "History", active: location.pathname === "/chats" },
   ];
@@ -288,6 +290,21 @@ function ProfilePageWrapper() {
   );
 }
 
+function CoffeeBatchWrapper() {
+  return (
+    <Authenticator>
+      {({ signOut, user }) => (
+        <div className="flex flex-col h-screen bg-base-300">
+          <NavBar user={user} signOut={signOut} />
+          <div className="flex-1 overflow-hidden bg-base-100">
+            <CoffeeBatchPage />
+          </div>
+        </div>
+      )}
+    </Authenticator>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -303,6 +320,8 @@ function App() {
             <Route path="/journal/:id/edit" element={<JournalEntryFormWrapper />} />
             <Route path="/chats" element={<ChatsPage />} />
             <Route path="/profile" element={<ProfilePageWrapper />} />
+            <Route path="/batches" element={<CoffeeBatchWrapper />} />
+            <Route path="/batches/:batchId" element={<CoffeeBatchWrapper />} />
           </Routes>
         </BrowserRouter>
       </TimezoneProvider>

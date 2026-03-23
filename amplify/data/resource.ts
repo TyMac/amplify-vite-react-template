@@ -223,12 +223,44 @@ const schema = a.schema({
   // ============================================
   // BREW JOURNAL - User tasting notes
   // ============================================
+  // COFFEE BATCH - Represents a specific bag/lot of coffee
+  // Identified by roaster + coffeeName + roastDate
+  // ============================================
+  CoffeeBatch: a
+    .model({
+      userId: a.string().required(),
+      coffeeName: a.string().required(),
+      roaster: a.string(),
+      roastDate: a.date(),
+      origin: a.string(),
+      variety: a.string(),
+      processing: a.enum(["WASHED", "NATURAL", "HONEY", "ANAEROBIC", "OTHER"]),
+      processingNote: a.string(),
+      roastLevel: a.enum([
+        "LIGHT",
+        "MEDIUM_LIGHT",
+        "MEDIUM",
+        "MEDIUM_DARK",
+        "DARK",
+      ]),
+      roastLevelNote: a.string(),
+      color: a.string(), // deterministic hex color derived from id
+      notes: a.string(), // general notes about the batch
+    })
+    .secondaryIndexes((index) => [index("userId")])
+    .authorization((allow) => [
+      allow.publicApiKey().to(["create", "read", "update", "delete"]),
+      allow.owner(),
+    ]),
+
+  // ============================================
   BrewJournal: a
     .model({
       userId: a.string(), // null for anonymous, populated for authenticated
+      coffeeBatchId: a.string(), // links to CoffeeBatch
       chatSessionIds: a.string().array(), // links to ChatSession (multiple chats can be pinned)
 
-      // Coffee details
+      // Coffee details (kept for backward compat; batch is source of truth when coffeeBatchId set)
       coffeeName: a.string().required(),
       roaster: a.string(),
       roastDate: a.date(),
@@ -294,7 +326,7 @@ const schema = a.schema({
       createdAt: a.datetime(),
       updatedAt: a.datetime(),
     })
-    .secondaryIndexes((index) => [index("userId")])
+    .secondaryIndexes((index) => [index("userId"), index("coffeeBatchId")])
     .authorization((allow) => [
       allow.publicApiKey().to(["create", "read", "update", "delete"]),
       allow.owner(),
