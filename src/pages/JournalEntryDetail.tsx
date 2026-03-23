@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { generateClient } from "aws-amplify/data";
+import { getUrl } from "aws-amplify/storage";
 import type { Schema } from "../../amplify/data/resource";
 import ScoreWheel from "../components/ScoreWheel";
 import { TagChip } from "../components/tags";
@@ -33,6 +34,8 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
   const [entry, setEntry] = useState<Schema["BrewJournal"]["type"] | null>(null);
   const [linkedChats, setLinkedChats] = useState<Schema["ChatSession"]["type"][]>([]);
   const [loading, setLoading] = useState(true);
+  const [chatImages, setChatImages] = useState<{ key: string; url: string; chatName: string }[]>([]);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -66,9 +69,36 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
         }
       }
       setLinkedChats(chats);
+      await resolveImages(chats);
     } catch (err) {
       console.error("Failed to load chat sessions:", err);
     }
+  }
+
+  async function resolveImages(chats: Schema["ChatSession"]["type"][]) {
+    const images: { key: string; url: string; chatName: string }[] = [];
+    for (const chat of chats) {
+      let msgs: { id: string; imageKey?: string }[] = [];
+      try {
+        const raw = chat.messages;
+        msgs = typeof raw === "string" ? JSON.parse(raw) : (raw as typeof msgs);
+      } catch {
+        continue;
+      }
+      for (const msg of msgs) {
+        if (!msg.imageKey) continue;
+        try {
+          const { url } = await getUrl({
+            path: msg.imageKey,
+            options: { expiresIn: 3600, validateObjectExistence: false },
+          });
+          images.push({ key: msg.imageKey, url: url.toString(), chatName: chat.name });
+        } catch (err) {
+          console.warn("Failed to resolve image", msg.imageKey, err);
+        }
+      }
+    }
+    setChatImages(images);
   }
 
   if (loading) {
@@ -334,6 +364,36 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
         </div>
       )}
 
+      {/* Chat Photos */}
+      {chatImages.length > 0 && (
+        <div className="card bg-base-100 shadow-sm border border-base-200 mb-6">
+          <div className="card-body p-4">
+            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
+              Photos
+            </h2>
+            <div className="grid grid-cols-3 gap-2">
+              {chatImages.map((img) => (
+                <button
+                  key={img.key}
+                  onClick={() => setLightboxUrl(img.url)}
+                  className="relative aspect-square rounded-lg overflow-hidden border border-base-200 hover:border-primary/50 transition-colors group"
+                  title={img.chatName}
+                >
+                  <img
+                    src={img.url}
+                    alt={`From ${img.chatName}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                  />
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-base-content/40 mt-2">
+              {chatImages.length} photo{chatImages.length !== 1 ? "s" : ""} from linked Coffee Talks
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Linked Chats */}
       {linkedChats.length > 0 && (
         <div className="card bg-base-100 shadow-sm border border-base-200 mb-6">
@@ -356,6 +416,28 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
                 </Link>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <div className="relative max-w-3xl max-h-full" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightboxUrl}
+              alt="Full size"
+              className="max-w-full max-h-[85vh] rounded-lg object-contain"
+            />
+            <button
+              onClick={() => setLightboxUrl(null)}
+              className="absolute top-2 right-2 btn btn-circle btn-sm bg-black/60 border-0 text-white hover:bg-black/80"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}
