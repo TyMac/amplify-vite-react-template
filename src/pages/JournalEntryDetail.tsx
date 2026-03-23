@@ -4,12 +4,19 @@ import { generateClient } from "aws-amplify/data";
 import type { Schema } from "../../amplify/data/resource";
 import ScoreWheel from "../components/ScoreWheel";
 import { TagChip } from "../components/tags";
+import { useTimezone } from "../contexts/TimezoneContext";
 
 const client = generateClient<Schema>();
 
-function formatDate(dateStr: string | null | undefined): string {
+function formatDate(dateStr: string | null | undefined, timezone: string): string {
   if (!dateStr) return "";
-  return new Date(dateStr).toLocaleDateString();
+  try {
+    return new Date(dateStr).toLocaleDateString("en-US", {
+      year: "numeric", month: "short", day: "numeric", timeZone: timezone
+    });
+  } catch {
+    return new Date(dateStr).toLocaleDateString();
+  }
 }
 
 interface JournalEntryDetailProps {
@@ -21,6 +28,7 @@ interface JournalEntryDetailProps {
 export default function JournalEntryDetail({ embedded, entryId: propEntryId, onEdit }: JournalEntryDetailProps) {
   const { id: paramId } = useParams();
   const id = propEntryId ?? paramId;
+  const { timezone } = useTimezone();
 
   const [entry, setEntry] = useState<Schema["BrewJournal"]["type"] | null>(null);
   const [linkedChats, setLinkedChats] = useState<Schema["ChatSession"]["type"][]>([]);
@@ -150,7 +158,7 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
         <div className="flex flex-wrap items-center gap-2 mt-2">
           {entry.brewDate && (
             <span className="text-sm text-base-content/50">
-              {formatDate(entry.brewDate)}
+              {formatDate(entry.brewDate, timezone)}
             </span>
           )}
           {entry.daysFromRoast !== null && entry.daysFromRoast !== undefined && (

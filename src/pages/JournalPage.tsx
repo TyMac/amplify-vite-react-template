@@ -5,29 +5,36 @@ import { useAuthenticator } from "@aws-amplify/ui-react";
 import type { Schema } from "../../amplify/data/resource";
 import JournalEntryDetail from "./JournalEntryDetail";
 import JournalEntryForm from "./JournalEntryForm";
+import { useTimezone } from "../contexts/TimezoneContext";
 
 const client = generateClient<Schema>();
 
-function formatDateKey(dateStr: string): string {
+function formatDateKey(dateStr: string, timezone: string): string {
   const d = new Date(dateStr);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
+  // Format in the user's timezone to get correct local date
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: timezone
+  }).formatToParts(d);
+  const y = parts.find(p => p.type === "year")?.value ?? "";
+  const m = parts.find(p => p.type === "month")?.value ?? "";
+  const day = parts.find(p => p.type === "day")?.value ?? "";
+  return `${y}-${m}-${day}`;
 }
 
-function formatShortDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+function formatShortDate(dateStr: string, timezone: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    weekday: "short", month: "short", day: "numeric", timeZone: timezone
+  });
 }
 
 // Generate last N days
-function generateDaysList(days: number): string[] {
+function generateDaysList(days: number, timezone: string): string[] {
   const result: string[] = [];
   const today = new Date();
   for (let i = 0; i < days; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
-    result.push(formatDateKey(d.toISOString()));
+    result.push(formatDateKey(d.toISOString(), timezone));
   }
   return result;
 }
@@ -36,6 +43,7 @@ export default function JournalPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuthenticator();
+  const { timezone } = useTimezone();
 
   const [entries, setEntries] = useState<Schema["BrewJournal"]["type"][]>([]);
   const [chatSessions, setChatSessions] = useState<Schema["ChatSession"]["type"][]>([]);
@@ -158,13 +166,13 @@ export default function JournalPage() {
 
   // Build timeline data - group entries and chats by date
   const timelineDays = useMemo(() => {
-    const days = generateDaysList(90);
+    const days = generateDaysList(90, timezone);
 
     // Map entries by date
     const entriesByDate = new Map<string, Schema["BrewJournal"]["type"][]>();
     entries.forEach((e) => {
       if (!e.brewDate) return;
-      const dateKey = formatDateKey(e.brewDate);
+      const dateKey = formatDateKey(e.brewDate, timezone);
       if (!entriesByDate.has(dateKey)) {
         entriesByDate.set(dateKey, []);
       }
@@ -175,7 +183,7 @@ export default function JournalPage() {
     const pinnedChatsByDate = new Map<string, { chat: Schema["ChatSession"]["type"]; entryId: string }[]>();
     entries.forEach((e) => {
       if (!e.brewDate || !e.chatSessionIds) return;
-      const dateKey = formatDateKey(e.brewDate);
+      const dateKey = formatDateKey(e.brewDate, timezone);
       e.chatSessionIds.forEach((chatId) => {
         if (!chatId) return;
         const chat = chatSessions.find((c) => c.id === chatId);
@@ -236,7 +244,7 @@ export default function JournalPage() {
     setSelectedDate(dateKey);
     // Find entry for this date
     const entriesForDate = entries.filter(
-      (e) => e.brewDate && formatDateKey(e.brewDate) === dateKey
+      (e) => e.brewDate && formatDateKey(e.brewDate, timezone) === dateKey
     );
     if (entriesForDate.length > 0) {
       setSelectedEntryId(entriesForDate[0].id);
@@ -408,7 +416,7 @@ export default function JournalPage() {
                     isSelected ? "bg-primary/5" : ""
                   }`}
                 >
-                  <p className="text-xs text-base-content/30">{formatShortDate(dateKey)}</p>
+                  <p className="text-xs text-base-content/30">{formatShortDate(dateKey, timezone)}</p>
                 </div>
               );
             }
@@ -424,7 +432,7 @@ export default function JournalPage() {
                   className="text-xs font-medium text-base-content/60 mb-1.5 cursor-pointer hover:text-primary"
                   onClick={() => handleDateClick(dateKey)}
                 >
-                  {formatShortDate(dateKey)}
+                  {formatShortDate(dateKey, timezone)}
                 </p>
                 <div className="flex flex-col gap-1">
                   {dayEntries.map((entry) => (

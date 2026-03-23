@@ -168,6 +168,9 @@ const schema = a.schema({
       // Taste preferences
       flavorPreference: a.enum(["CLARITY", "BODY", "BALANCED"]),
 
+      // Display preferences
+      timezone: a.string(), // IANA timezone string e.g. "America/New_York"
+
       // Tracking
       clickedProducts: a.string().array(), // for conversion tracking
     })

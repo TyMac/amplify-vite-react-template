@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { fetchUserAttributes } from "aws-amplify/auth";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { TimezoneProvider } from "./contexts/TimezoneContext";
 import ThemeToggle from "./components/ThemeToggle";
 import ChatHistoryPage from "./pages/ChatHistoryPage";
 import ChatPage from "./pages/ChatPage";
 import JournalPage from "./pages/JournalPage";
 import JournalEntryForm from "./pages/JournalEntryForm";
 import JournalEntryDetail from "./pages/JournalEntryDetail";
+import ProfilePage from "./pages/ProfilePage";
 import "./App.css";
 
 function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () => void }) {
@@ -70,6 +72,14 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
                 <p className="text-sm font-medium truncate">{displayName}</p>
               </li>
               <li>
+                <Link
+                  to="/profile"
+                  className="block w-full text-left px-3 py-2 text-sm hover:bg-base-200 rounded-lg transition-colors"
+                >
+                  Profile &amp; Preferences
+                </Link>
+              </li>
+              <li>
                 <button
                   onClick={signOut}
                   className="w-full text-left px-3 py-2 text-sm text-error hover:bg-base-200 rounded-lg transition-colors"
@@ -104,6 +114,14 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
                     <p className="text-xs text-base-content/50 leading-none mb-0.5">Signed in as</p>
                     <p className="text-sm font-medium truncate">{displayName}</p>
                   </div>
+                </li>
+                <li>
+                  <Link
+                    to="/profile"
+                    className="block w-full text-left px-3 py-2 text-sm hover:bg-base-200 rounded-lg transition-colors"
+                  >
+                    Profile &amp; Preferences
+                  </Link>
                 </li>
                 <li>
                   <button
@@ -257,21 +275,37 @@ function JournalEntryDetailWrapper() {
   );
 }
 
+function ProfilePageWrapper() {
+  return (
+    <Authenticator>
+      {({ signOut, user }) => (
+        <div className="min-h-screen bg-base-300">
+          <NavBar user={user} signOut={signOut} />
+          <ProfilePage />
+        </div>
+      )}
+    </Authenticator>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/chat" element={<LiveChatPage />} />
-          <Route path="/chat/:sessionId" element={<LiveChatPage />} />
-          <Route path="/journal" element={<JournalPageWrapper />} />
-          <Route path="/journal/new" element={<JournalEntryFormWrapper />} />
-          <Route path="/journal/:id" element={<JournalEntryDetailWrapper />} />
-          <Route path="/journal/:id/edit" element={<JournalEntryFormWrapper />} />
-          <Route path="/chats" element={<ChatsPage />} />
-        </Routes>
-      </BrowserRouter>
+      <TimezoneProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/chat" element={<LiveChatPage />} />
+            <Route path="/chat/:sessionId" element={<LiveChatPage />} />
+            <Route path="/journal" element={<JournalPageWrapper />} />
+            <Route path="/journal/new" element={<JournalEntryFormWrapper />} />
+            <Route path="/journal/:id" element={<JournalEntryDetailWrapper />} />
+            <Route path="/journal/:id/edit" element={<JournalEntryFormWrapper />} />
+            <Route path="/chats" element={<ChatsPage />} />
+            <Route path="/profile" element={<ProfilePageWrapper />} />
+          </Routes>
+        </BrowserRouter>
+      </TimezoneProvider>
     </ThemeProvider>
   );
 }
