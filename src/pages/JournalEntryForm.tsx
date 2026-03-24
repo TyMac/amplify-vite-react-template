@@ -63,6 +63,7 @@ interface JournalEntryFormProps {
   embedded?: boolean;
   preLinkedChatId?: string;
   selectedDate?: string;
+  prefillBatchId?: string; // pre-populate coffee fields from this batch
   onSave?: (entryId: string) => void;
   onCancel?: () => void;
 }
@@ -71,6 +72,7 @@ export default function JournalEntryForm({
   embedded,
   preLinkedChatId,
   selectedDate,
+  prefillBatchId,
   onSave,
   onCancel,
 }: JournalEntryFormProps) {
@@ -180,11 +182,12 @@ export default function JournalEntryForm({
     }
   }, [preLinkedChatId]);
 
-  // Pre-populate coffee fields from batchId URL param (e.g. "+ Brew" from batch detail)
+  // Pre-populate coffee fields from a batch (via URL param or prop)
+  const effectiveBatchId = batchIdFromUrl ?? prefillBatchId ?? null;
   useEffect(() => {
-    if (!batchIdFromUrl || isEdit) return;
+    if (!effectiveBatchId || isEdit) return;
     (async () => {
-      const { data: batch } = await client.models.CoffeeBatch.get({ id: batchIdFromUrl });
+      const { data: batch } = await client.models.CoffeeBatch.get({ id: effectiveBatchId });
       if (!batch) return;
       setCoffeeName(batch.coffeeName);
       setRoaster(batch.roaster ?? "");
@@ -196,7 +199,7 @@ export default function JournalEntryForm({
       setRoastLevelNote(batch.roastLevelNote ?? "");
       setRoastDate(batch.roastDate ?? null);
     })();
-  }, [batchIdFromUrl, isEdit]);
+  }, [effectiveBatchId, isEdit]);
 
   // Batch lookup — triggers when the three identifying fields are all set
   useEffect(() => {

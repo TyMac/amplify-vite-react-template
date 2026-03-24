@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { generateClient } from "aws-amplify/data";
 import { useAuthenticator } from "@aws-amplify/ui-react";
@@ -10,25 +10,24 @@ import { batchColor } from "../services/coffeeBatch";
 
 const client = generateClient<Schema>();
 
+const STORAGE_KEY = "journal_last_entry";
+
 function formatDateKey(dateStr: string, timezone: string): string {
-  const d = new Date(dateStr);
-  // Format in the user's timezone to get correct local date
   const parts = new Intl.DateTimeFormat("en-US", {
-    year: "numeric", month: "2-digit", day: "2-digit", timeZone: timezone
-  }).formatToParts(d);
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: timezone,
+  }).formatToParts(new Date(dateStr));
   const y = parts.find(p => p.type === "year")?.value ?? "";
   const m = parts.find(p => p.type === "month")?.value ?? "";
-  const day = parts.find(p => p.type === "day")?.value ?? "";
-  return `${y}-${m}-${day}`;
+  const d = parts.find(p => p.type === "day")?.value ?? "";
+  return `${y}-${m}-${d}`;
 }
 
 function formatShortDate(dateStr: string, timezone: string): string {
   return new Date(dateStr).toLocaleDateString("en-US", {
-    weekday: "short", month: "short", day: "numeric", timeZone: timezone
+    weekday: "short", month: "short", day: "numeric", timeZone: timezone,
   });
 }
 
-// Generate last N days
 function generateDaysList(days: number, timezone: string): string[] {
   const result: string[] = [];
   const today = new Date();
@@ -47,26 +46,35 @@ export default function JournalPage() {
   const { timezone } = useTimezone();
 
   const [entries, setEntries] = useState<Schema["BrewJournal"]["type"][]>([]);
+  const [batches, setBatches] = useState<Schema["CoffeeBatch"]["type"][]>([]);
   const [chatSessions, setChatSessions] = useState<Schema["ChatSession"]["type"][]>([]);
   const [loading, setLoading] = useState(true);
 
-  // State management for 3-pane layout
-  const STORAGE_KEY = "journal_last_entry";
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  // 3-pane state
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(() => {
     try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
   });
   const [isCreatingNew, setIsCreatingNew] = useState(false);
+  // When creating new from a batch, pre-fill the batch
+  const [newBrewBatchId, setNewBrewBatchId] = useState<string | null>(null);
 
-  // Pre-linked chat from query param
   const preLinkChatId = searchParams.get("chatId");
 
+  // Derive selectedDate from the selected entry (always in sync)
+  const selectedEntry = useMemo(
+    () => entries.find((e) => e.id === selectedEntryId) ?? null,
+    [entries, selectedEntryId]
+  );
+  const selectedDateKey = useMemo(() => {
+    if (!selectedEntry?.brewDate) return null;
+    return formatDateKey(selectedEntry.brewDate, timezone);
+  }, [selectedEntry, timezone]);
+
   useEffect(() => {
-    loadEntries();
-    loadChatSessions();
+    loadAll();
   }, [user]);
 
-  // Persist last opened entry to localStorage
+  // Persist last opened entry
   useEffect(() => {
     try {
       if (selectedEntryId) localStorage.setItem(STORAGE_KEY, selectedEntryId);
@@ -74,125 +82,96 @@ export default function JournalPage() {
     } catch {}
   }, [selectedEntryId]);
 
-  // When entries load, restore selectedDate for the persisted entry
-  useEffect(() => {
-    if (selectedEntryId && entries.length > 0 && !selectedDate) {
-      const entry = entries.find((e) => e.id === selectedEntryId);
-      if (entry?.brewDate) {
-        setSelectedDate(entry.brewDate.split("T")[0]);
-      }
-    }
-  }, [entries, selectedEntryId]);
-
   // Handle pre-linked chat from URL
   useEffect(() => {
     if (preLinkChatId) {
       setIsCreatingNew(true);
       setSelectedEntryId(null);
+      setNewBrewBatchId(null);
     }
   }, [preLinkChatId]);
 
-  async function loadEntries() {
+  async function loadAll() {
     if (!user?.userId) return;
     setLoading(true);
     try {
-      const { data } = await client.models.BrewJournal.list({
-        filter: { userId: { eq: user.userId } },
-      });
-      const sorted = [...(data ?? [])].sort((a, b) => {
-        const dateA = a.brewDate ? new Date(a.brewDate).getTime() : 0;
-        const dateB = b.brewDate ? new Date(b.brewDate).getTime() : 0;
-        return dateB - dateA;
-      });
-      setEntries(sorted);
-    } catch (err) {
-      console.error("Failed to load journal entries:", err);
+      const [{ data: entriesData }, { data: batchesData }, { data: chatsData }] = await Promise.all([
+        client.models.BrewJournal.list({ filter: { userId: { eq: user.userId } } }),
+        client.models.CoffeeBatch.list({ filter: { userId: { eq: user.userId } } }),
+        client.models.ChatSession.list({ filter: { userId: { eq: user.userId } } }),
+      ]);
+
+      const sortedEntries = [...(entriesData ?? [])].sort((a, b) =>
+        (b.brewDate ?? "").localeCompare(a.brewDate ?? "")
+      );
+      setEntries(sortedEntries);
+      setBatches(batchesData ?? []);
+      setChatSessions(
+        [...(chatsData ?? [])].sort((a, b) =>
+          (b.updatedAt ?? "").localeCompare(a.updatedAt ?? "")
+        )
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  async function loadChatSessions() {
-    if (!user?.userId) return;
-    try {
-      const { data } = await client.models.ChatSession.list({
-        filter: { userId: { eq: user.userId } },
-      });
-      const sorted = [...(data ?? [])].sort((a, b) => {
-        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-        return dateB - dateA;
-      });
-      setChatSessions(sorted);
-    } catch (err) {
-      console.error("Failed to load chat sessions:", err);
-    }
-  }
+  // ── Left pane: batch context ──────────────────────────────────────────
+  // If selected entry belongs to a batch, show other brews for that batch.
+  // Otherwise fall back to related chats by tag.
 
-  // Get all flavor tags from all journal entries
+  const selectedBatch = useMemo(() => {
+    if (!selectedEntry?.coffeeBatchId) return null;
+    return batches.find((b) => b.id === selectedEntry.coffeeBatchId) ?? null;
+  }, [selectedEntry, batches]);
+
+  const batchEntries = useMemo(() => {
+    if (!selectedBatch) return [];
+    return entries
+      .filter((e) => e.coffeeBatchId === selectedBatch.id)
+      .sort((a, b) => (b.brewDate ?? "").localeCompare(a.brewDate ?? ""));
+  }, [selectedBatch, entries]);
+
+  // Related chats by tag (fallback when no batch)
   const allJournalTags = useMemo(() => {
     const tags = new Set<string>();
-    entries.forEach((e) => {
-      (e.flavorNotes ?? []).forEach((tag) => {
-        if (tag) tags.add(tag.toLowerCase());
-      });
-    });
+    entries.forEach((e) => (e.flavorNotes ?? []).forEach((t) => t && tags.add(t.toLowerCase())));
     return tags;
   }, [entries]);
 
-  // Get all pinned chat IDs across all journal entries
   const allPinnedChatIds = useMemo(() => {
     const ids = new Set<string>();
-    entries.forEach((e) => {
-      (e.chatSessionIds ?? []).forEach((id) => {
-        if (id) ids.add(id);
-      });
-    });
+    entries.forEach((e) => (e.chatSessionIds ?? []).forEach((id) => id && ids.add(id)));
     return ids;
   }, [entries]);
 
-  // Filter chats that have overlapping tags with any journal entry
   const relatedChats = useMemo(() => {
-    return chatSessions.filter((chat) => {
-      const chatTags = (chat.tags ?? []).map((t) => t?.toLowerCase()).filter(Boolean);
-      return chatTags.some((tag) => tag && allJournalTags.has(tag));
-    });
+    return chatSessions.filter((chat) =>
+      (chat.tags ?? []).some((t) => t && allJournalTags.has(t.toLowerCase()))
+    );
   }, [chatSessions, allJournalTags]);
 
-  // Get the currently selected entry
-  const selectedEntry = useMemo(() => {
-    if (!selectedEntryId) return null;
-    return entries.find((e) => e.id === selectedEntryId) ?? null;
-  }, [entries, selectedEntryId]);
-
-  // Build timeline data - group entries and chats by date
+  // ── Timeline ──────────────────────────────────────────────────────────
   const timelineDays = useMemo(() => {
     const days = generateDaysList(90, timezone);
-
-    // Map entries by date
     const entriesByDate = new Map<string, Schema["BrewJournal"]["type"][]>();
     entries.forEach((e) => {
       if (!e.brewDate) return;
-      const dateKey = formatDateKey(e.brewDate, timezone);
-      if (!entriesByDate.has(dateKey)) {
-        entriesByDate.set(dateKey, []);
-      }
-      entriesByDate.get(dateKey)!.push(e);
+      const key = formatDateKey(e.brewDate, timezone);
+      if (!entriesByDate.has(key)) entriesByDate.set(key, []);
+      entriesByDate.get(key)!.push(e);
     });
 
-    // Map pinned chats by journal entry date
-    const pinnedChatsByDate = new Map<string, { chat: Schema["ChatSession"]["type"]; entryId: string }[]>();
+    const pinnedChatsByDate = new Map<string, { chat: Schema["ChatSession"]["type"] }[]>();
     entries.forEach((e) => {
       if (!e.brewDate || !e.chatSessionIds) return;
-      const dateKey = formatDateKey(e.brewDate, timezone);
+      const key = formatDateKey(e.brewDate, timezone);
       e.chatSessionIds.forEach((chatId) => {
         if (!chatId) return;
         const chat = chatSessions.find((c) => c.id === chatId);
         if (chat) {
-          if (!pinnedChatsByDate.has(dateKey)) {
-            pinnedChatsByDate.set(dateKey, []);
-          }
-          pinnedChatsByDate.get(dateKey)!.push({ chat, entryId: e.id });
+          if (!pinnedChatsByDate.has(key)) pinnedChatsByDate.set(key, []);
+          pinnedChatsByDate.get(key)!.push({ chat });
         }
       });
     });
@@ -202,174 +181,211 @@ export default function JournalPage() {
       entries: entriesByDate.get(dateKey) ?? [],
       pinnedChats: pinnedChatsByDate.get(dateKey) ?? [],
     }));
-  }, [entries, chatSessions]);
+  }, [entries, chatSessions, timezone]);
 
-  // Pin a chat to the currently selected entry
+  // ── Actions ───────────────────────────────────────────────────────────
+  function handleEntryClick(entryId: string) {
+    setSelectedEntryId(entryId);
+    setIsCreatingNew(false);
+    setNewBrewBatchId(null);
+  }
+
+  function handleNewEntry(batchId?: string) {
+    setSelectedEntryId(null);
+    setIsCreatingNew(true);
+    setNewBrewBatchId(batchId ?? null);
+  }
+
+  function handleDateClick(dateKey: string) {
+    const dayEntries = entries.filter(
+      (e) => e.brewDate && formatDateKey(e.brewDate, timezone) === dateKey
+    );
+    if (dayEntries.length > 0) {
+      handleEntryClick(dayEntries[0].id);
+    } else {
+      handleNewEntry();
+    }
+  }
+
+  const handleSave = useCallback(
+    async (entryId: string) => {
+      await loadAll();
+      setSelectedEntryId(entryId);
+      setIsCreatingNew(false);
+      setNewBrewBatchId(null);
+      if (preLinkChatId) navigate("/journal", { replace: true });
+    },
+    [preLinkChatId]
+  );
+
   async function pinChatToEntry(chatId: string) {
     if (!selectedEntryId) return;
     const entry = entries.find((e) => e.id === selectedEntryId);
     if (!entry) return;
-
-    const currentIds = (entry.chatSessionIds ?? []).filter((id): id is string => id !== null);
-    if (currentIds.includes(chatId)) return;
-
-    try {
-      await client.models.BrewJournal.update({
-        id: selectedEntryId,
-        chatSessionIds: [...currentIds, chatId],
-      });
-      await loadEntries();
-    } catch (err) {
-      console.error("Failed to pin chat:", err);
-    }
+    const current = (entry.chatSessionIds ?? []).filter((id): id is string => id !== null);
+    if (current.includes(chatId)) return;
+    await client.models.BrewJournal.update({ id: selectedEntryId, chatSessionIds: [...current, chatId] });
+    await loadAll();
   }
 
-  // Check if a chat is pinned to the selected entry
-  function isChatPinnedToSelected(chatId: string): boolean {
-    if (!selectedEntry) return false;
-    return (selectedEntry.chatSessionIds ?? []).includes(chatId);
-  }
-
-  // Get matching tags between a chat and journal entries
-  function getMatchingTags(chat: Schema["ChatSession"]["type"]): string[] {
-    const chatTags = (chat.tags ?? []).map((t) => t?.toLowerCase()).filter(Boolean) as string[];
-    return chatTags.filter((tag) => allJournalTags.has(tag));
-  }
-
-  function handleEntryClick(entryId: string) {
-    setSelectedEntryId(entryId);
-    setIsCreatingNew(false);
-  }
-
-  function handleDateClick(dateKey: string) {
-    setSelectedDate(dateKey);
-    // Find entry for this date
-    const entriesForDate = entries.filter(
-      (e) => e.brewDate && formatDateKey(e.brewDate, timezone) === dateKey
-    );
-    if (entriesForDate.length > 0) {
-      setSelectedEntryId(entriesForDate[0].id);
-      setIsCreatingNew(false);
-    } else {
-      // No entry for this date - show new entry form
-      setSelectedEntryId(null);
-      setIsCreatingNew(true);
-    }
-  }
-
-  function handleNewEntry() {
-    setSelectedEntryId(null);
-    setIsCreatingNew(true);
+  function isChatPinnedToSelected(chatId: string) {
+    return (selectedEntry?.chatSessionIds ?? []).includes(chatId);
   }
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[calc(100vh-4rem)]">
-        <span className="loading loading-spinner loading-md text-primary"></span>
+        <span className="loading loading-spinner loading-md text-primary" />
       </div>
     );
   }
 
+  // ── Render ────────────────────────────────────────────────────────────
   return (
     <div className="flex h-[calc(100vh-4rem)]">
-      {/* Left Pane - Related Chats */}
-      <div className="hidden lg:flex flex-col w-64 border-r border-base-200 bg-base-100">
-        <div className="p-3 border-b border-base-200">
-          <h2 className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">
-            Related Chats
-          </h2>
-        </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {relatedChats.length === 0 ? (
-            <p className="text-xs text-base-content/40 p-2">
-              Chats with matching flavor tags will appear here
-            </p>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {relatedChats.map((chat) => {
-                const isPinned = allPinnedChatIds.has(chat.id);
-                const isPinnedToSelected = isChatPinnedToSelected(chat.id);
-                const matchingTags = getMatchingTags(chat);
 
-                return (
-                  <div
-                    key={chat.id}
-                    className={`card card-compact border ${
-                      isPinned ? "border-success/50 bg-success/5" : "border-base-200"
-                    }`}
-                  >
-                    <div className="card-body p-2">
-                      <div className="flex items-start justify-between gap-1">
-                        <div className="flex-1 min-w-0">
+      {/* ── Left Pane: Batch context or related chats ── */}
+      <div className="hidden lg:flex flex-col w-64 border-r border-base-200 bg-base-100">
+        {selectedBatch ? (
+          <>
+            {/* Batch header */}
+            <div className="p-3 border-b border-base-200">
+              <div className="flex items-center gap-2 mb-1">
+                <span
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: selectedBatch.color ?? batchColor(selectedBatch.id) }}
+                />
+                <p className="text-xs font-semibold text-base-content/70 uppercase tracking-wider truncate">
+                  {selectedBatch.coffeeName}
+                </p>
+              </div>
+              {selectedBatch.roaster && (
+                <p className="text-xs text-base-content/40 mb-2">{selectedBatch.roaster}</p>
+              )}
+              <button
+                onClick={() => handleNewEntry(selectedBatch.id)}
+                className="btn btn-primary btn-xs w-full"
+              >
+                + New Brew for this Batch
+              </button>
+            </div>
+
+            {/* Brew list for batch */}
+            <div className="flex-1 overflow-y-auto p-2">
+              <p className="text-xs text-base-content/40 px-1 mb-1">
+                {batchEntries.length} brew{batchEntries.length !== 1 ? "s" : ""}
+              </p>
+              <div className="flex flex-col gap-1">
+                {batchEntries.map((e, idx) => {
+                  const isActive = e.id === selectedEntryId;
+                  const color = selectedBatch.color ?? batchColor(selectedBatch.id);
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => handleEntryClick(e.id)}
+                      className={`w-full text-left rounded-lg px-2.5 py-2 transition-colors border ${
+                        isActive
+                          ? "border-current"
+                          : "border-transparent hover:bg-base-200"
+                      }`}
+                      style={isActive ? { borderColor: color, backgroundColor: color + "18" } : {}}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-base-content/40">
+                          Brew #{batchEntries.length - idx}
+                        </span>
+                        {e.rating != null && (
+                          <span className="text-xs text-base-content/40">{e.rating}/10</span>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium" style={{ color }}>
+                        {e.brewDate
+                          ? new Date(e.brewDate).toLocaleDateString("en-US", {
+                              month: "short", day: "numeric", timeZone: timezone,
+                            })
+                          : "—"}
+                      </p>
+                      {e.brewMethod && (
+                        <p className="text-xs text-base-content/40">{e.brewMethod}</p>
+                      )}
+                      {e.daysFromRoast != null && (
+                        <p className="text-xs text-base-content/30">{e.daysFromRoast}d from roast</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Fallback: related chats */}
+            <div className="p-3 border-b border-base-200">
+              <h2 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
+                Related Chats
+              </h2>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {relatedChats.length === 0 ? (
+                <p className="text-xs text-base-content/40 p-2">
+                  Chats with matching flavor tags will appear here
+                </p>
+              ) : (
+                <div className="flex flex-col gap-1.5">
+                  {relatedChats.map((chat) => {
+                    const isPinned = allPinnedChatIds.has(chat.id);
+                    const isPinnedToSelected = isChatPinnedToSelected(chat.id);
+                    const chatTags = (chat.tags ?? []).filter((t): t is string => !!t && allJournalTags.has(t.toLowerCase()));
+                    return (
+                      <div
+                        key={chat.id}
+                        className={`card card-compact border ${isPinned ? "border-success/50 bg-success/5" : "border-base-200"}`}
+                      >
+                        <div className="card-body p-2">
                           <Link
                             to={`/chat/${chat.id}`}
                             className="text-sm font-medium truncate block hover:text-primary"
                           >
                             {chat.name}
                           </Link>
-                          <p className="text-xs text-base-content/40">
-                            {chat.updatedAt
-                              ? new Date(chat.updatedAt).toLocaleDateString()
-                              : ""}
-                          </p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {chatTags.slice(0, 3).map((tag) => (
+                              <span key={tag} className="badge badge-xs badge-outline">{tag}</span>
+                            ))}
+                          </div>
+                          <div className="mt-1.5">
+                            {isPinnedToSelected ? (
+                              <span className="text-xs text-success">Pinned ✓</span>
+                            ) : selectedEntryId ? (
+                              <button onClick={() => pinChatToEntry(chat.id)} className="btn btn-xs btn-ghost">Pin</button>
+                            ) : isPinned ? (
+                              <span className="text-xs text-success/70">Pinned ✓</span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {matchingTags.slice(0, 3).map((tag) => (
-                          <span
-                            key={tag}
-                            className="badge badge-xs badge-outline"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="mt-1.5">
-                        {isPinnedToSelected ? (
-                          <span className="text-xs text-success flex items-center gap-1">
-                            <span>Pinned</span>
-                            <span>✓</span>
-                          </span>
-                        ) : selectedEntryId ? (
-                          <button
-                            onClick={() => pinChatToEntry(chat.id)}
-                            className="btn btn-xs btn-ghost"
-                          >
-                            Pin
-                          </button>
-                        ) : isPinned ? (
-                          <span className="text-xs text-success/70">Pinned ✓</span>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
 
-      {/* Middle Pane - Entry Detail/Form */}
+      {/* ── Middle Pane: Entry detail or form ── */}
       <div className="flex-1 flex flex-col min-w-0 bg-base-50">
         <div className="flex-1 overflow-y-auto">
           {isCreatingNew ? (
             <JournalEntryForm
               embedded
               preLinkedChatId={preLinkChatId ?? undefined}
-              selectedDate={selectedDate ?? undefined}
-              onSave={(entryId) => {
-                loadEntries();
-                setSelectedEntryId(entryId);
-                setIsCreatingNew(false);
-                // Clear the chatId param
-                if (preLinkChatId) {
-                  navigate("/journal", { replace: true });
-                }
-              }}
+              prefillBatchId={newBrewBatchId ?? undefined}
+              onSave={handleSave}
               onCancel={() => {
                 setIsCreatingNew(false);
-                if (entries.length > 0) {
+                setNewBrewBatchId(null);
+                if (entries.length > 0 && !selectedEntryId) {
                   setSelectedEntryId(entries[0].id);
                 }
               }}
@@ -378,14 +394,14 @@ export default function JournalPage() {
             <JournalEntryDetail
               embedded
               entryId={selectedEntry.id}
-              onEdit={() => {
-                navigate(`/journal/${selectedEntry.id}/edit`);
-              }}
+              onEdit={() => navigate(`/journal/${selectedEntry.id}/edit`)}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full p-6">
-              <p className="text-base-content/50 mb-4">Select an entry from the timeline or create a new one</p>
-              <button onClick={handleNewEntry} className="btn btn-primary btn-sm">
+              <p className="text-base-content/50 mb-4">
+                Select an entry from the timeline or create a new one
+              </p>
+              <button onClick={() => handleNewEntry()} className="btn btn-primary btn-sm">
                 + New Entry
               </button>
             </div>
@@ -393,31 +409,35 @@ export default function JournalPage() {
         </div>
       </div>
 
-      {/* Right Pane - Timeline */}
+      {/* ── Right Pane: Timeline ── */}
       <div className="hidden lg:flex flex-col w-96 border-l border-base-200 bg-base-100">
         <div className="p-3 border-b border-base-200 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">
+          <h2 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
             Timeline
           </h2>
-          <button onClick={handleNewEntry} className="btn btn-primary btn-xs gap-1">
+          <button onClick={() => handleNewEntry()} className="btn btn-primary btn-xs">
             + New
           </button>
         </div>
+
         <div className="flex-1 overflow-y-auto">
           {timelineDays.map(({ dateKey, entries: dayEntries, pinnedChats }) => {
             const hasContent = dayEntries.length > 0 || pinnedChats.length > 0;
-            const isSelected = selectedDate === dateKey;
+            // Highlight this date row if the selected entry falls on it
+            const isActiveDate = selectedDateKey === dateKey;
 
             if (!hasContent) {
               return (
                 <div
                   key={dateKey}
                   onClick={() => handleDateClick(dateKey)}
-                  className={`px-3 py-1.5 border-b border-base-100 cursor-pointer hover:bg-base-200/50 ${
-                    isSelected ? "bg-primary/5" : ""
+                  className={`px-3 py-1.5 border-b border-base-100 cursor-pointer hover:bg-base-200/50 transition-colors ${
+                    isActiveDate ? "bg-primary/5" : ""
                   }`}
                 >
-                  <p className="text-xs text-base-content/30">{formatShortDate(dateKey, timezone)}</p>
+                  <p className={`text-xs ${isActiveDate ? "text-primary font-medium" : "text-base-content/30"}`}>
+                    {formatShortDate(dateKey, timezone)}
+                  </p>
                 </div>
               );
             }
@@ -425,14 +445,18 @@ export default function JournalPage() {
             return (
               <div
                 key={dateKey}
-                className={`px-3 py-2 border-b border-base-200 ${
-                  isSelected ? "bg-primary/10" : ""
+                className={`px-3 py-2 border-b border-base-200 transition-colors ${
+                  isActiveDate ? "bg-primary/8" : ""
                 }`}
+                style={isActiveDate ? { backgroundColor: "oklch(var(--p)/0.06)" } : {}}
               >
                 <p
-                  className="text-xs font-medium text-base-content/60 mb-1.5 cursor-pointer hover:text-primary"
+                  className={`text-xs font-medium mb-1.5 cursor-pointer hover:text-primary ${
+                    isActiveDate ? "text-primary" : "text-base-content/60"
+                  }`}
                   onClick={() => handleDateClick(dateKey)}
                 >
+                  {isActiveDate && <span className="mr-1">▸</span>}
                   {formatShortDate(dateKey, timezone)}
                 </p>
                 <div className="flex flex-col gap-1">
@@ -440,25 +464,27 @@ export default function JournalPage() {
                     const color = entry.coffeeBatchId
                       ? batchColor(entry.coffeeBatchId)
                       : "#6b7280";
-                    const isSelected = selectedEntryId === entry.id;
+                    const isActiveEntry = selectedEntryId === entry.id;
                     return (
                       <button
                         key={entry.id}
                         onClick={() => handleEntryClick(entry.id)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border transition-colors w-full text-left ${
-                          isSelected ? "ring-1" : "bg-transparent hover:bg-base-200"
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border transition-all w-full text-left ${
+                          isActiveEntry ? "" : "bg-transparent hover:bg-base-200"
                         }`}
                         style={{
                           borderColor: color,
                           color: color,
-                          ...(isSelected ? { backgroundColor: color + "22", ringColor: color } : {}),
+                          ...(isActiveEntry
+                            ? { backgroundColor: color + "28", boxShadow: `0 0 0 1.5px ${color}` }
+                            : {}),
                         }}
                       >
-                        <span
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: color }}
-                        />
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                         <span className="truncate">{entry.coffeeName}</span>
+                        {entry.rating != null && (
+                          <span className="ml-auto opacity-60 flex-shrink-0">{entry.rating}/10</span>
+                        )}
                       </button>
                     );
                   })}
@@ -466,7 +492,7 @@ export default function JournalPage() {
                     <Link
                       key={chat.id}
                       to={`/chat/${chat.id}`}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-secondary text-secondary bg-transparent hover:bg-secondary/10 transition-colors w-full"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-secondary/50 text-secondary bg-transparent hover:bg-secondary/10 transition-colors w-full"
                     >
                       <span>💬</span>
                       <span className="truncate">{chat.name}</span>
@@ -479,9 +505,9 @@ export default function JournalPage() {
         </div>
       </div>
 
-      {/* Mobile: Simplified view - just show middle pane content with a floating action button */}
+      {/* Mobile FAB */}
       <div className="lg:hidden fixed bottom-20 right-4 z-10">
-        <button onClick={handleNewEntry} className="btn btn-primary btn-circle shadow-lg">
+        <button onClick={() => handleNewEntry()} className="btn btn-primary btn-circle shadow-lg">
           <span className="text-xl">+</span>
         </button>
       </div>

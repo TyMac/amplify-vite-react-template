@@ -32,7 +32,6 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
   const navLinks = [
     { to: "/", label: "Home", active: location.pathname === "/" },
     { to: "/chat", label: "Coffee Talk", active: location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") },
-    { to: "/batches", label: "Batches", active: location.pathname.startsWith("/batches") },
     { to: "/journal", label: "Journal", active: location.pathname.startsWith("/journal") },
     { to: "/chats", label: "History", active: location.pathname === "/chats" },
   ];
