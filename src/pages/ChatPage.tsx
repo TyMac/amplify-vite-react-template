@@ -8,8 +8,9 @@ import {
   type ChatMessage,
   type ChatSession,
 } from "../services/chatStorage";
-import { chatWithGemini } from "../services/gemini";
+import { chatWithGemini, BARISTA_SYSTEM_PROMPT } from "../services/gemini";
 import { TagChip, TagEditor } from "../components/tags";
+import { getCurrentUser } from "aws-amplify/auth";
 
 const client = generateClient<Schema>();
 
@@ -86,6 +87,7 @@ export default function ChatPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   // Cache of resolved S3 presigned URLs: messageId → url
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [equipmentPrompt, setEquipmentPrompt] = useState<string | null>(null);
 
   // Journal linking state
   const [linkedJournalEntry, setLinkedJournalEntry] = useState<Schema["BrewJournal"]["type"] | null>(null);
@@ -102,6 +104,28 @@ export default function ChatPage() {
   // Load session list on mount
   useEffect(() => {
     loadSessionList();
+    // Load equipment prefs for system prompt
+    (async () => {
+      try {
+        const { userId } = await getCurrentUser();
+        const { data } = await client.models.UserPreference.list({ filter: { userId: { eq: userId } } });
+        const pref = data?.[0];
+        if (pref) {
+          const lines: string[] = [];
+          if (pref.grinder && pref.grinder !== "None") lines.push(`Grinder: ${pref.grinder}`);
+          if (pref.dripper && pref.dripper !== "None") lines.push(`Dripper: ${pref.dripper}`);
+          if (pref.kettle && pref.kettle !== "None") lines.push(`Kettle: ${pref.kettle}`);
+          if (pref.scale && pref.scale !== "None") lines.push(`Scale: ${pref.scale}`);
+          if (lines.length > 0) {
+            setEquipmentPrompt(
+              `${BARISTA_SYSTEM_PROMPT}\n\nThe user has the following equipment set up:\n${lines.join("\n")}\n\nWhen giving brew advice, grind settings, recipes, or troubleshooting tips, tailor your recommendations specifically to their equipment unless they tell you they're using something different.`
+            );
+          }
+        }
+      } catch {
+        // Not signed in
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -379,7 +403,7 @@ export default function ChatPage() {
         content: m.content,
       }));
 
-      const response = await chatWithGemini(allMessages);
+      const response = await chatWithGemini(allMessages, equipmentPrompt ?? undefined);
 
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),

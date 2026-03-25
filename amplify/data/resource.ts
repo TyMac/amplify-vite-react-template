@@ -168,6 +168,12 @@ const schema = a.schema({
       // Taste preferences
       flavorPreference: a.enum(["CLARITY", "BODY", "BALANCED"]),
 
+      // Equipment
+      grinder: a.string(),
+      dripper: a.string(),
+      kettle: a.string(),
+      scale: a.string(),
+
       // Display preferences
       timezone: a.string(), // IANA timezone string e.g. "America/New_York"
 

@@ -7,6 +7,12 @@ import type { Schema } from "../../amplify/data/resource";
 
 const client = generateClient<Schema>();
 
+// Equipment options (shared with barista-mobile)
+const GRINDERS = ["None","Baratza Encore","Baratza Virtuoso+","1Zpresso JX-Pro","Comandante C40","Fellow Ode","Timemore Chestnut","Other"];
+const DRIPPERS = ["None","Hario V60 01","Hario V60 02","Hario V60 03","Kalita Wave 155","Kalita Wave 185","Chemex 6-cup","Chemex 8-cup","Fellow Stagg [X]","AeroPress","Other"];
+const KETTLES = ["None","Fellow Stagg EKG","Hario Buono","Bonavita Variable Temp","Brewista Artisan","Timemore Fish","Other"];
+const SCALES = ["None","Acaia Pearl","Acaia Lunar","Timemore Black Mirror","Hario Drip Scale","Brewista Smart Scale","Other"];
+
 // Common IANA timezones grouped by region
 const TIMEZONE_OPTIONS = [
   { label: "US & Canada", zones: [
@@ -42,6 +48,10 @@ export default function ProfilePage() {
   const [userId, setUserId] = useState("");
   const [prefId, setPrefId] = useState<string | null>(null);
   const [selectedTz, setSelectedTz] = useState(timezone);
+  const [grinder, setGrinder] = useState("None");
+  const [dripper, setDripper] = useState("None");
+  const [kettle, setKettle] = useState("None");
+  const [scale, setScale] = useState("None");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -60,6 +70,10 @@ export default function ProfilePage() {
         if (pref) {
           setPrefId(pref.id);
           if (pref.timezone) setSelectedTz(pref.timezone);
+          if (pref.grinder) setGrinder(pref.grinder);
+          if (pref.dripper) setDripper(pref.dripper);
+          if (pref.kettle) setKettle(pref.kettle);
+          if (pref.scale) setScale(pref.scale);
         }
       } catch (err) {
         console.error("Failed to load profile", err);
@@ -72,10 +86,17 @@ export default function ProfilePage() {
     setSaving(true);
     setSaved(false);
     try {
+      const prefData = {
+        timezone: selectedTz,
+        grinder: grinder !== "None" ? grinder : null,
+        dripper: dripper !== "None" ? dripper : null,
+        kettle: kettle !== "None" ? kettle : null,
+        scale: scale !== "None" ? scale : null,
+      };
       if (prefId) {
-        await client.models.UserPreference.update({ id: prefId, timezone: selectedTz });
+        await client.models.UserPreference.update({ id: prefId, ...prefData });
       } else {
-        const result = await client.models.UserPreference.create({ userId, timezone: selectedTz });
+        const result = await client.models.UserPreference.create({ userId, ...prefData });
         setPrefId(result.data?.id ?? null);
       }
       setTimezone(selectedTz);
@@ -154,15 +175,54 @@ export default function ProfilePage() {
             <p className="text-sm text-base-content/60">{previewTime}</p>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className={`btn btn-primary btn-sm w-full ${saving ? "loading" : ""}`}
-          >
-            {saving ? "Saving..." : saved ? "✓ Saved" : "Save Preferences"}
-          </button>
         </div>
       </section>
+
+      {/* Equipment */}
+      <section className="card bg-base-100 shadow-sm border border-base-200 mb-6">
+        <div className="card-body p-4 space-y-3">
+          <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase">Equipment</h2>
+          <p className="text-sm text-base-content/60">
+            Your equipment is used to personalize brew advice in Coffee Talk. Shared across web and mobile.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label py-1"><span className="label-text text-sm">Grinder</span></label>
+              <select value={grinder} onChange={(e) => setGrinder(e.target.value)} className="select select-bordered w-full select-sm">
+                {GRINDERS.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label py-1"><span className="label-text text-sm">Dripper</span></label>
+              <select value={dripper} onChange={(e) => setDripper(e.target.value)} className="select select-bordered w-full select-sm">
+                {DRIPPERS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label py-1"><span className="label-text text-sm">Kettle</span></label>
+              <select value={kettle} onChange={(e) => setKettle(e.target.value)} className="select select-bordered w-full select-sm">
+                {KETTLES.map((k) => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label py-1"><span className="label-text text-sm">Scale</span></label>
+              <select value={scale} onChange={(e) => setScale(e.target.value)} className="select select-bordered w-full select-sm">
+                {SCALES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Save button */}
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className={`btn btn-primary btn-sm w-full mb-6 ${saving ? "loading" : ""}`}
+      >
+        {saving ? "Saving..." : saved ? "✓ Saved" : "Save Preferences"}
+      </button>
     </div>
   );
 }
