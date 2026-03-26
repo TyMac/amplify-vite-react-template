@@ -266,7 +266,7 @@ export default function JournalPage() {
                 onClick={() => handleNewEntry(selectedBatch.id)}
                 className="btn btn-primary btn-xs w-full"
               >
-                + New Brew for this Batch
+                + New Brew Entry for this Journal
               </button>
             </div>
 
@@ -416,7 +416,7 @@ export default function JournalPage() {
             Timeline
           </h2>
           <button onClick={() => handleNewEntry()} className="btn btn-primary btn-xs">
-            + New
+            + Start New Journal
           </button>
         </div>
 
