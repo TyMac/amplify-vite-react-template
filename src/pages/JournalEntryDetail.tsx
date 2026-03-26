@@ -283,7 +283,7 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
               )}
               {entry.roastLevelNote && (
                 <div>
-                  <p className="text-xs text-base-content/50 uppercase tracking-wider mb-0.5">Roast Level Notes</p>
+                  <p className="text-xs text-base-content/50 uppercase tracking-wider mb-0.5">Roast Profile Notes</p>
                   <p className="text-sm text-base-content/80">{entry.roastLevelNote}</p>
                 </div>
               )}
@@ -336,6 +336,18 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
             {entry.aromaNote && (
               <p className="text-sm whitespace-pre-wrap">{entry.aromaNote}</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Initial Impressions */}
+      {entry.initialImpressions && (
+        <div className="card bg-base-100 shadow-sm border border-base-200 mb-6">
+          <div className="card-body p-4">
+            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
+              Initial Impressions
+            </h2>
+            <p className="text-sm whitespace-pre-wrap">{entry.initialImpressions}</p>
           </div>
         </div>
       )}

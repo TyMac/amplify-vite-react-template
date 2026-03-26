@@ -299,6 +299,7 @@ const schema = a.schema({
       extractionNote: a.string(), // free-text observations on extraction
 
       // Tasting notes
+      initialImpressions: a.string(), // first impressions before deep analysis
       tastingNotes: a.string(), // main journal entry (markdown supported)
       flavorNotes: a.string().array(), // ['blueberry', 'chocolate']
       rating: a.integer(), // 1-10

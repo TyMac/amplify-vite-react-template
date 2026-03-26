@@ -143,6 +143,7 @@ export default function JournalEntryForm({
   const [flavorNotes, setFlavorNotes] = useState<string[]>([]);
 
   // Notes
+  const [initialImpressions, setInitialImpressions] = useState("");
   const [tastingNotes, setTastingNotes] = useState("");
   const [finishNote, setFinishNote] = useState("");
 
@@ -418,6 +419,7 @@ export default function JournalEntryForm({
         setClarity(data.clarity ?? 3);
         setFinish(data.finish ?? 3);
         setFlavorNotes((data.flavorNotes ?? []).filter((n): n is string => n !== null));
+        setInitialImpressions(data.initialImpressions || "");
         setTastingNotes(data.tastingNotes || "");
         setFinishNote(data.finishNote || "");
         setSelectedChatIds((data.chatSessionIds ?? []).filter((id): id is string => id !== null));
@@ -540,6 +542,7 @@ export default function JournalEntryForm({
         clarity,
         finish,
         flavorNotes,
+        initialImpressions: initialImpressions.trim() || null,
         tastingNotes: tastingNotes.trim() || null,
         finishNote: finishNote.trim() || null,
         rating,
@@ -699,7 +702,7 @@ export default function JournalEntryForm({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="label py-1">
-                    <span className="label-text text-sm">Roast Level<AIBadge show={autoFilledFields.has("roastLevel")} /></span>
+                    <span className="label-text text-sm">Roast Profile<AIBadge show={autoFilledFields.has("roastLevel")} /></span>
                   </label>
                   <select
                     value={roastLevel || ""}
@@ -718,7 +721,7 @@ export default function JournalEntryForm({
                     onChange={(e) => setRoastLevelNote(e.target.value)}
                     className="textarea textarea-bordered w-full mt-2 text-sm"
                     rows={2}
-                    placeholder="How did the roast level affect the cup? (brightness, body, development...)"
+                    placeholder="How does the roast profile compare in development against other roasters?"
                   />
                 </div>
                 <div>
@@ -916,6 +919,22 @@ export default function JournalEntryForm({
                 />
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Section: Initial Impressions */}
+        <section className="card bg-base-100 shadow-sm border border-base-200">
+          <div className="card-body p-4">
+            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
+              Initial Impressions
+            </h2>
+            <textarea
+              value={initialImpressions}
+              onChange={(e) => setInitialImpressions(e.target.value)}
+              className="textarea textarea-bordered w-full text-sm"
+              rows={3}
+              placeholder="First impressions as you taste — before analyzing. What hits first? How does it evolve?"
+            />
           </div>
         </section>
 
