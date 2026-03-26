@@ -266,7 +266,7 @@ export default function JournalPage() {
                 onClick={() => handleNewEntry(selectedBatch.id)}
                 className="btn btn-primary btn-xs w-full"
               >
-                + New Brew Entry for this Journal
+                + Add Journal Entry
               </button>
             </div>
 
