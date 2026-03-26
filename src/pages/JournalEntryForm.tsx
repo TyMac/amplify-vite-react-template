@@ -68,6 +68,50 @@ interface JournalEntryFormProps {
   onCancel?: () => void;
 }
 
+function AccordionSection({
+  title,
+  defaultOpen = false,
+  badge,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  badge?: string | number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="card bg-base-100 shadow-sm border border-base-200 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-base-200/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <h2 className="text-xs font-semibold tracking-widest text-base-content/60 uppercase">
+            {title}
+          </h2>
+          {badge != null && badge !== "" && (
+            <span className="badge badge-xs badge-primary">{badge}</span>
+          )}
+        </div>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className={`w-4 h-4 text-base-content/40 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1 border-t border-base-200">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function JournalEntryForm({
   embedded,
   preLinkedChatId,
@@ -616,11 +660,7 @@ export default function JournalEntryForm({
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         {/* Section: The Coffee */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              The Coffee
-            </h2>
+        <AccordionSection title="The Coffee" defaultOpen={true}>
             <div className="flex flex-col gap-3">
               <div>
                 <label className="label py-1">
@@ -756,15 +796,10 @@ export default function JournalEntryForm({
                   : "New batch — a coffee batch will be created when you save"}
               </div>
             )}
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Section: The Brew */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              The Brew
-            </h2>
+        <AccordionSection title="The Brew" defaultOpen={true}>
             <div className="flex flex-col gap-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -919,15 +954,10 @@ export default function JournalEntryForm({
                 />
               </div>
             </div>
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Section: Initial Impressions */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Initial Impressions
-            </h2>
+        <AccordionSection title="Initial Impressions">
             <textarea
               value={initialImpressions}
               onChange={(e) => setInitialImpressions(e.target.value)}
@@ -935,15 +965,10 @@ export default function JournalEntryForm({
               rows={3}
               placeholder="First impressions as you taste — before analyzing. What hits first? How does it evolve?"
             />
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Section: Aroma */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Aroma
-            </h2>
+        <AccordionSection title="Aroma">
             <div className="flex flex-col gap-3">
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -972,15 +997,10 @@ export default function JournalEntryForm({
                 />
               </div>
             </div>
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Section: Tasting Scores */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Tasting Scores
-            </h2>
+        <AccordionSection title="Tasting Scores">
             <div className="flex flex-col lg:flex-row gap-6">
               {/* Left: all 16 sliders */}
               <div className="flex flex-col gap-3 lg:w-64 shrink-0">
@@ -1029,25 +1049,15 @@ export default function JournalEntryForm({
                 />
               </div>
             </div>
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Section: Flavor Tags */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Flavor Tags<AIBadge show={autoFilledFields.has("flavorNotes")} />
-            </h2>
+        <AccordionSection title="Flavor Tags">
             <FlavorWheelPicker value={flavorNotes} onChange={setFlavorNotes} />
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Section: Notes */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Notes
-            </h2>
+        <AccordionSection title="Notes">
             <div className="flex flex-col gap-3">
               <div>
                 <label className="label py-1">
@@ -1074,16 +1084,10 @@ export default function JournalEntryForm({
                 />
               </div>
             </div>
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Section: Coffee Talk Links */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Link to Coffee Talks
-            </h2>
-
+        <AccordionSection title="Link to Coffee Talks">
             {/* Linked chats as chips */}
             {linkedChatDetails.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
@@ -1133,15 +1137,10 @@ export default function JournalEntryForm({
                 <p className="text-xs text-base-content/40">No matching chats found</p>
               )}
             </div>
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Section: Rating */}
-        <section className="card bg-base-100 shadow-sm border border-base-200">
-          <div className="card-body p-4">
-            <h2 className="text-xs font-semibold tracking-widest text-base-content/50 uppercase mb-3">
-              Overall Rating
-            </h2>
+        <AccordionSection title="Overall Rating" defaultOpen={true}>
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
                 <button
@@ -1157,8 +1156,7 @@ export default function JournalEntryForm({
               ))}
               <span className="ml-2 text-sm text-base-content/60">{rating}/10</span>
             </div>
-          </div>
-        </section>
+        </AccordionSection>
 
         {/* Save Button */}
         <button
