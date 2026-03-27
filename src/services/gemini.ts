@@ -90,16 +90,47 @@ export interface ExtractedJournalFields {
   confidence: "high" | "medium" | "low";
 }
 
+// Tag category taxonomy — maps each tag to its semantic role for AI context
+const TAG_CATEGORIES: Record<string, string> = {
+  // Roasters
+  "Onyx": "roaster", "Black & White": "roaster", "Intelligentsia": "roaster",
+  "Counter Culture": "roaster", "Stumptown": "roaster", "Blue Bottle": "roaster",
+  "Four Barrel": "roaster", "Verve": "roaster", "Heart": "roaster",
+  "George Howell": "roaster", "Vibrant": "roaster", "SEY": "roaster",
+  "Luna": "roaster", "Passenger": "roaster", "Equator": "roaster",
+  // Countries
+  "Ethiopia": "origin country", "Colombia": "origin country", "Kenya": "origin country",
+  "Guatemala": "origin country", "Honduras": "origin country", "Peru": "origin country",
+  "Brazil": "origin country", "Costa Rica": "origin country", "Panama": "origin country",
+  "Rwanda": "origin country", "Burundi": "origin country", "Yemen": "origin country",
+  "Indonesia": "origin country", "Papua New Guinea": "origin country",
+  // Process
+  "Washed": "process", "Natural": "process", "Honey": "process",
+  "White Honey": "process", "Fermented Honey": "process",
+  "Anaerobic": "process", "Natural Anaerobic": "process",
+  "Extended Fermentation": "process", "Carbonic Maceration": "process",
+  // Roast level
+  "Light": "roast level", "Medium": "roast level", "Dark": "roast level",
+  // Varietals
+  "Gesha": "varietal", "Bourbon": "varietal", "Typica": "varietal",
+  "Catuai": "varietal", "Caturra": "varietal", "Heirloom": "varietal",
+  "SL28": "varietal", "SL34": "varietal", "Pacamara": "varietal",
+};
+
 export async function extractJournalFieldsFromChat(
   messages: { role: string; content: string }[],
   tags: string[] = []
 ): Promise<{ success: boolean; fields: ExtractedJournalFields }> {
   const messagesJson = messages.map((msg) => JSON.stringify(msg));
-  // Append a synthetic context message with the chat tags so the Lambda can use them
+  // Append a synthetic context message with categorized tags so the AI understands each tag's role
   if (tags.length > 0) {
+    const categorized = tags.map((tag) => {
+      const category = TAG_CATEGORIES[tag];
+      return category ? `${tag} (${category})` : tag;
+    });
     messagesJson.push(JSON.stringify({
       role: "system",
-      content: `[Chat tags for additional context: ${tags.join(", ")}]`,
+      content: `[Chat tags with semantic hints — use these to inform field extraction:\n${categorized.map(t => `• ${t}`).join("\n")}\nIf a tag is labeled "roaster", use it for the roaster field. If "origin country", use for origin. If "process", map to processing. If "roast level", map to roastLevel. If "varietal", use for variety.]`,
     }));
   }
 

@@ -317,6 +317,8 @@ async function extractJournalFields(args: { messages: string[] }) {
 Conversation:
 ${conversationText}
 
+Important: If the conversation includes a system message with "Chat tags with semantic hints", treat those tags as strong signals for field extraction. A tag labeled "(roaster)" should populate the roaster field. A tag labeled "(origin country)" should populate origin. A tag labeled "(process)" maps to processing. A tag labeled "(roast level)" maps to roastLevel. A tag labeled "(varietal)" maps to variety. These tags were assigned by the user and are highly reliable.
+
 Return ONLY the JSON object, no markdown, no explanation.`;
 
   const model = 'gemini-2.0-flash-lite-001';
