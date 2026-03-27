@@ -272,6 +272,7 @@ export default function JournalEntryDetail({ embedded, entryId: propEntryId, onE
             <div className="mt-3 pt-3 border-t border-base-200 space-y-2">
               <div className="flex flex-wrap gap-1.5">
                 {entry.variety && <TagChip tag={entry.variety} />}
+                {entry.altitude != null && <TagChip tag={`${entry.altitude} masl`} />}
                 {entry.processing && <TagChip tag={entry.processing.replace(/_/g, " ")} />}
                 {entry.roastLevel && <TagChip tag={entry.roastLevel.replace(/_/g, " ")} />}
               </div>

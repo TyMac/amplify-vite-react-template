@@ -290,6 +290,7 @@ async function extractJournalFields(args: { messages: string[] }) {
   "roaster": string | null,           // roaster name
   "origin": string | null,           // country or region of origin
   "variety": string | null,           // bean variety (gesha, bourbon, typica, etc.)
+  "altitude": number | null,          // farm altitude in meters above sea level (masl) if mentioned
   "processing": "WASHED" | "NATURAL" | "HONEY" | "ANAEROBIC" | "OTHER" | null,
   "roastLevel": "LIGHT" | "MEDIUM_LIGHT" | "MEDIUM" | "MEDIUM_DARK" | "DARK" | null,
   "roastDate": string | null,         // ISO date string if mentioned (YYYY-MM-DD)
@@ -366,6 +367,7 @@ Return ONLY the JSON object, no markdown, no explanation.`;
           roaster: null,
           origin: null,
           variety: null,
+          altitude: null,
           processing: null,
           roastLevel: null,
           roastDate: null,

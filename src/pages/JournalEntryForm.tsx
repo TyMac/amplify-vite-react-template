@@ -140,6 +140,7 @@ export default function JournalEntryForm({
   const [roaster, setRoaster] = useState("");
   const [origin, setOrigin] = useState("");
   const [variety, setVariety] = useState("");
+  const [altitude, setAltitude] = useState<number | null>(null);
   const [processing, setProcessing] = useState<BrewJournalInput["processing"]>(null);
   const [processingNote, setProcessingNote] = useState("");
   const [roastLevel, setRoastLevel] = useState<BrewJournalInput["roastLevel"]>(null);
@@ -238,6 +239,7 @@ export default function JournalEntryForm({
       setRoaster(batch.roaster ?? "");
       setOrigin(batch.origin ?? "");
       setVariety(batch.variety ?? "");
+      setAltitude(batch.altitude ?? null);
       setProcessing(batch.processing ?? null);
       setProcessingNote(batch.processingNote ?? "");
       setRoastLevel(batch.roastLevel ?? null);
@@ -361,6 +363,13 @@ export default function JournalEntryForm({
         setVariety(fields.variety);
         filledFields.add("variety");
       }
+      if (fields.altitude && altitude === null) {
+        const alt = typeof fields.altitude === "number" ? fields.altitude : parseInt(String(fields.altitude));
+        if (!isNaN(alt)) {
+          setAltitude(alt);
+          filledFields.add("altitude");
+        }
+      }
       if (fields.processing && !processing) {
         setProcessing(fields.processing);
         filledFields.add("processing");
@@ -428,6 +437,7 @@ export default function JournalEntryForm({
         setRoaster(data.roaster || "");
         setOrigin(data.origin || "");
         setVariety(data.variety || "");
+        setAltitude(data.altitude ?? null);
         setProcessing(data.processing || null);
         setProcessingNote(data.processingNote || "");
         setRoastLevel(data.roastLevel || null);
@@ -536,6 +546,7 @@ export default function JournalEntryForm({
             roastDate: roastDate || null,
             origin: origin.trim() || null,
             variety: variety.trim() || null,
+            altitude: altitude ?? null,
             processing: processing ?? undefined,
             processingNote: processingNote.trim() || null,
             roastLevel: roastLevel ?? undefined,
@@ -551,6 +562,7 @@ export default function JournalEntryForm({
         roaster: roaster.trim() || null,
         origin: origin.trim() || null,
         variety: variety.trim() || null,
+        altitude: altitude ?? null,
         processing,
         processingNote: processingNote.trim() || null,
         roastLevel,
@@ -712,6 +724,22 @@ export default function JournalEntryForm({
                     onChange={(e) => setVariety(e.target.value)}
                     className="input input-bordered w-full"
                     placeholder="e.g. Gesha"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label py-1">
+                    <span className="label-text text-sm">Altitude (masl)<AIBadge show={autoFilledFields.has("altitude")} /></span>
+                  </label>
+                  <input
+                    type="number"
+                    value={altitude ?? ""}
+                    onChange={(e) => setAltitude(e.target.value ? Number(e.target.value) : null)}
+                    className="input input-bordered w-full"
+                    placeholder="e.g. 1800"
+                    min={0}
+                    max={4000}
                   />
                 </div>
                 <div>

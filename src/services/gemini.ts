@@ -66,6 +66,7 @@ export interface ExtractedJournalFields {
   roaster: string | null;
   origin: string | null;
   variety: string | null;
+  altitude: number | null;
   processing: "WASHED" | "NATURAL" | "HONEY" | "ANAEROBIC" | "OTHER" | null;
   roastLevel: "LIGHT" | "MEDIUM_LIGHT" | "MEDIUM" | "MEDIUM_DARK" | "DARK" | null;
   roastDate: string | null;
@@ -114,6 +115,7 @@ export async function extractJournalFieldsFromChat(
         roaster: null,
         origin: null,
         variety: null,
+        altitude: null,
         processing: null,
         roastLevel: null,
         roastDate: null,

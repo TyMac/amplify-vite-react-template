@@ -70,6 +70,7 @@ export async function createBatch(
     roastDate?: string | null;
     origin?: string | null;
     variety?: string | null;
+    altitude?: number | null;
     processing?: Schema["CoffeeBatch"]["type"]["processing"];
     processingNote?: string | null;
     roastLevel?: Schema["CoffeeBatch"]["type"]["roastLevel"];
@@ -84,6 +85,7 @@ export async function createBatch(
       roastDate: fields.roastDate ?? null,
       origin: fields.origin ?? null,
       variety: fields.variety ?? null,
+      altitude: fields.altitude ?? null,
       processing: fields.processing ?? null,
       processingNote: fields.processingNote ?? null,
       roastLevel: fields.roastLevel ?? null,

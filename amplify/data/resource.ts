@@ -240,6 +240,7 @@ const schema = a.schema({
       roastDate: a.date(),
       origin: a.string(),
       variety: a.string(),
+      altitude: a.integer(), // meters above sea level (masl)
       processing: a.enum(["WASHED", "NATURAL", "HONEY", "ANAEROBIC", "OTHER"]),
       processingNote: a.string(),
       roastLevel: a.enum([
@@ -272,6 +273,7 @@ const schema = a.schema({
       roastDate: a.date(),
       origin: a.string(),
       variety: a.string(), // bean variety e.g. gesha, bourbon
+      altitude: a.integer(), // meters above sea level (masl) e.g. 1800
       processing: a.enum(["WASHED", "NATURAL", "HONEY", "ANAEROBIC", "OTHER"]),
       processingNote: a.string(), // notes on how processing affected the cup
       roastLevel: a.enum([
