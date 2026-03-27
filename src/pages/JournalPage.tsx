@@ -57,6 +57,14 @@ export default function JournalPage() {
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   // When creating new from a batch, pre-fill the batch
   const [newBrewBatchId, setNewBrewBatchId] = useState<string | null>(null);
+  // Timeline panel — open by default on wide screens (≥1280px), collapsed on narrower
+  const [timelineOpen, setTimelineOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem("journal_timeline_open");
+      if (saved !== null) return saved === "true";
+    } catch {}
+    return typeof window !== "undefined" ? window.innerWidth >= 1280 : true;
+  });
 
   const preLinkChatId = searchParams.get("chatId");
 
@@ -81,6 +89,11 @@ export default function JournalPage() {
       else localStorage.removeItem(STORAGE_KEY);
     } catch {}
   }, [selectedEntryId]);
+
+  // Persist timeline open/closed preference
+  useEffect(() => {
+    try { localStorage.setItem("journal_timeline_open", String(timelineOpen)); } catch {}
+  }, [timelineOpen]);
 
   // Handle pre-linked chat from URL
   useEffect(() => {
@@ -410,14 +423,45 @@ export default function JournalPage() {
       </div>
 
       {/* ── Right Pane: Timeline ── */}
-      <div className="hidden lg:flex flex-col w-96 border-l border-base-200 bg-base-100">
+      <div className={`hidden lg:flex flex-col border-l border-base-200 bg-base-100 transition-all duration-200 ${timelineOpen ? "w-96" : "w-10"}`}>
+
+        {/* Collapsed rail — just toggle button */}
+        {!timelineOpen && (
+          <div className="flex flex-col items-center pt-3 gap-2">
+            <button
+              onClick={() => setTimelineOpen(true)}
+              className="btn btn-ghost btn-xs btn-square"
+              title="Expand timeline"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+            </button>
+            <span className="text-xs text-base-content/30 [writing-mode:vertical-lr] rotate-180 tracking-wider uppercase mt-2">Timeline</span>
+          </div>
+        )}
+
+        {/* Expanded panel */}
+        {timelineOpen && (
+          <>
         <div className="p-3 border-b border-base-200 flex items-center justify-between">
           <h2 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
             Timeline
           </h2>
-          <button onClick={() => handleNewEntry()} className="btn btn-primary btn-xs">
-            + Start New Journal
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => handleNewEntry()} className="btn btn-primary btn-xs">
+              + Start New Journal
+            </button>
+            <button
+              onClick={() => setTimelineOpen(false)}
+              className="btn btn-ghost btn-xs btn-square"
+              title="Collapse timeline"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -503,6 +547,8 @@ export default function JournalPage() {
             );
           })}
         </div>
+          </>
+        )}
       </div>
 
       {/* Mobile FAB */}
