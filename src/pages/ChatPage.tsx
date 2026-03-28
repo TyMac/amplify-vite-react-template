@@ -19,7 +19,7 @@ function FormattedMessage({ content }: { content: string }) {
   const lines = content.split("\n");
 
   return (
-    <div className="flex flex-col gap-0.5">
+    <div className="flex flex-col gap-0.5 w-full break-words">
       {lines.map((line, i) => {
         // Heading
         const h = line.match(/^##\s+(.+)$/);
@@ -641,10 +641,10 @@ export default function ChatPage() {
                 key={msg.id}
                 className={`flex flex-col gap-0.5 ${isUser ? "items-end" : "items-start"}`}
               >
-                <div className="relative group max-w-[85%]">
+                <div className="relative group max-w-[85%] min-w-0">
                   <div
                     className={`
-                      rounded-2xl px-4 py-3 text-sm leading-relaxed
+                      rounded-2xl px-4 py-3 text-sm leading-relaxed break-words
                       ${
                         isUser
                           ? "bg-primary text-primary-content rounded-br-sm"
