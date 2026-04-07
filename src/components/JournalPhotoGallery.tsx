@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { getUrl } from "aws-amplify/storage";
 import type { Schema } from "../../amplify/data/resource";
 
@@ -11,7 +11,7 @@ interface PhotoItem {
 
 interface JournalPhotoGalleryProps {
   chatSessions: Schema["ChatSession"]["type"][];
-  pinnedChatIds: string[];
+  pinnedChatIds: (unknown)[] | unknown;
 }
 
 export default function JournalPhotoGallery({ chatSessions, pinnedChatIds }: JournalPhotoGalleryProps) {
@@ -22,37 +22,49 @@ export default function JournalPhotoGallery({ chatSessions, pinnedChatIds }: Jou
   const photos = useMemo(() => {
     const result: PhotoItem[] = [];
     
-    pinnedChatIds.forEach((chatId) => {
+    const chatIdsArray = Array.isArray(pinnedChatIds)
+      ? pinnedChatIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    
+    chatIdsArray.forEach((chatId) => {
       const chat = chatSessions.find((c) => c.id === chatId);
-      if (!chat || !chat.messages) return;
-
-      // Iterate through messages in reverse to get newest images first
-      const messages = [...chat.messages].reverse();
-      messages.forEach((msg) => {
-        if (msg.imageKey) {
-          result.push({
-            imageKey: msg.imageKey,
-            chatSessionId: chatId,
-            chatName: chat.name,
-            messageId: msg.id || "",
-          });
+      if (!chat) return;
+      
+      const messages = Array.isArray(chat.messages) ? chat.messages : [];
+      const reversedMessages = [...messages].reverse();
+      
+      reversedMessages.forEach((msg) => {
+        if (msg && typeof msg === 'object' && 'imageKey' in msg) {
+          const imageKey = (msg as any).imageKey;
+          const messageId = (msg as any).id;
+          if (typeof imageKey === 'string') {
+            result.push({
+              imageKey,
+              chatSessionId: chatId,
+              chatName: typeof chat.name === 'string' ? chat.name : "Untitled Chat",
+              messageId: typeof messageId === 'string' ? messageId : "",
+            });
+          }
         }
       });
     });
 
     return result;
-  }, [chatSessions, pinnedChatIds]);
+  }, [chatSessions, pinnedChatIds]) as PhotoItem[];
 
   // Load image URL when needed
-  const getImageUrl = async (imageKey: string) => {
+  const getImageUrl = async (imageKey: string): Promise<string | null> => {
     if (imageUrls.has(imageKey)) {
-      return imageUrls.get(imageKey);
+      const cached = imageUrls.get(imageKey);
+      if (cached) return cached;
     }
 
     try {
       const result = await getUrl({ key: imageKey });
-      const url = result.url.toString();
-      setImageUrls((prev) => new Map(prev).set(imageKey, url));
+      const url = result.url?.toString() || null;
+      if (url) {
+        setImageUrls((prev) => new Map(prev).set(imageKey, url));
+      }
       return url;
     } catch (error) {
       console.error("Failed to load image:", error);
@@ -60,7 +72,7 @@ export default function JournalPhotoGallery({ chatSessions, pinnedChatIds }: Jou
     }
   };
 
-  if (photos.length === 0) {
+  if (!Array.isArray(photos) || photos.length === 0) {
     return (
       <div className="p-3 border-t border-base-200">
         <p className="text-xs text-base-content/40 text-center py-4">
@@ -87,7 +99,6 @@ export default function JournalPhotoGallery({ chatSessions, pinnedChatIds }: Jou
               key={`${photo.messageId}-${photo.imageKey}`}
               photo={photo}
               getImageUrl={getImageUrl}
-              isExpanded={expandedPhotoKey === photo.imageKey}
               onExpand={() => setExpandedPhotoKey(photo.imageKey)}
             />
           ))}
@@ -110,12 +121,10 @@ export default function JournalPhotoGallery({ chatSessions, pinnedChatIds }: Jou
 function PhotoThumbnail({
   photo,
   getImageUrl,
-  isExpanded,
   onExpand,
 }: {
   photo: PhotoItem;
   getImageUrl: (key: string) => Promise<string | null>;
-  isExpanded: boolean;
   onExpand: () => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
