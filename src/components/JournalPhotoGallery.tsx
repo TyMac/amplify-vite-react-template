@@ -30,14 +30,25 @@ export default function JournalPhotoGallery({ chatSessions, pinnedChatIds }: Jou
       const chat = chatSessions.find((c) => c.id === chatId);
       if (!chat) return;
       
-      const messages = Array.isArray(chat.messages) ? chat.messages : [];
+      let messages: any[] = [];
+      if (Array.isArray(chat.messages)) {
+        messages = chat.messages;
+      } else if (typeof chat.messages === 'string') {
+        try {
+          const parsed = JSON.parse(chat.messages);
+          if (Array.isArray(parsed)) messages = parsed;
+        } catch (e) {
+          console.error("Failed to parse chat messages", e);
+        }
+      }
+      
       const reversedMessages = [...messages].reverse();
       
       reversedMessages.forEach((msg) => {
         if (msg && typeof msg === 'object' && 'imageKey' in msg) {
           const imageKey = (msg as any).imageKey;
           const messageId = (msg as any).id;
-          if (typeof imageKey === 'string') {
+          if (typeof imageKey === 'string' && imageKey.trim() !== '') {
             result.push({
               imageKey,
               chatSessionId: chatId,
@@ -60,7 +71,10 @@ export default function JournalPhotoGallery({ chatSessions, pinnedChatIds }: Jou
     }
 
     try {
-      const result = await getUrl({ key: imageKey });
+      const result = await getUrl({ 
+        path: imageKey,
+        options: { expiresIn: 3600, validateObjectExistence: false }
+      });
       const url = result.url?.toString() || null;
       if (url) {
         setImageUrls((prev) => new Map(prev).set(imageKey, url));
