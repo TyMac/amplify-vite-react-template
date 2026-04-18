@@ -32,6 +32,7 @@ export default function JournalRecipeGallery({
   const [recipes, setRecipes] = useState<GeneratedRecipe[]>([]);
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [selectedRecipeMarkdown, setSelectedRecipeMarkdown] = useState<string | null>(null);
+  const [lastCreatedRecipeId, setLastCreatedRecipeId] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -53,6 +54,7 @@ export default function JournalRecipeGallery({
       setRecipes([]);
       setSelectedRecipeId(null);
       setSelectedRecipeMarkdown(null);
+      setLastCreatedRecipeId(null);
       return;
     }
     void loadRecipes();
@@ -108,7 +110,7 @@ export default function JournalRecipeGallery({
     };
   }, [recipes, selectedRecipeId]);
 
-  async function loadRecipes() {
+  async function loadRecipes(preferredRecipeId?: string) {
     if (!journalEntry?.id) return;
     setLoadingRecipes(true);
     setError(null);
@@ -124,6 +126,15 @@ export default function JournalRecipeGallery({
         return right.localeCompare(left);
       });
       setRecipes(sorted);
+      setSelectedRecipeId((current) => {
+        if (preferredRecipeId && sorted.some((recipe) => recipe.id === preferredRecipeId)) {
+          return preferredRecipeId;
+        }
+        if (current && sorted.some((recipe) => recipe.id === current)) {
+          return current;
+        }
+        return sorted[0]?.id ?? null;
+      });
     } catch (err) {
       console.error("Failed to load recipes", err);
       setError("Unable to load generated recipes.");
@@ -136,6 +147,7 @@ export default function JournalRecipeGallery({
     if (!journalEntry || !effectiveUserId) return;
     setGenerating(true);
     setError(null);
+    setLastCreatedRecipeId(null);
 
     try {
       const preference = await loadUserPreference(effectiveUserId);
@@ -147,6 +159,7 @@ export default function JournalRecipeGallery({
       });
 
       const generatedAt = new Date().toISOString();
+      const generatedDateKey = generatedAt.slice(0, 10);
       const recipeMarkdown = renderRecipeMarkdown(draft, {
         journalId: journalEntry.id,
         batchId: batch?.id ?? null,
@@ -155,14 +168,14 @@ export default function JournalRecipeGallery({
       });
 
       const recipeTitle = draft.recipe_name.trim() || `${journalEntry.coffeeName} Recipe`;
-      const fileName = buildRecipeFileName(recipeTitle, generatedAt);
+      const fileName = buildRecipeFileName(recipeTitle, generatedAt, effectiveUserId);
 
       const uploadTask = uploadData({
         path: ({ identityId }) => {
           if (!identityId) {
             throw new Error("Missing storage identity");
           }
-          return `private/${identityId}/recipes/${journalEntry.id}/${fileName}`;
+          return `private/${identityId}/recipes/${effectiveUserId}/${generatedDateKey}/${fileName}`;
         },
         data: new Blob([recipeMarkdown], { type: "text/markdown;charset=utf-8" }),
         options: { contentType: "text/markdown;charset=utf-8" },
@@ -185,8 +198,9 @@ export default function JournalRecipeGallery({
         recipeRecord.sourceBatchId = batch.id;
       }
 
-      await client.models.GeneratedRecipe.create(recipeRecord as any);
-      await loadRecipes();
+      const { data: createdRecipe } = await client.models.GeneratedRecipe.create(recipeRecord as any);
+      setLastCreatedRecipeId(createdRecipe?.id ?? null);
+      await loadRecipes(createdRecipe?.id ?? undefined);
     } catch (err) {
       console.error("Failed to generate recipe", err);
       setError(err instanceof Error ? err.message : "Failed to generate recipe.");
@@ -257,6 +271,26 @@ export default function JournalRecipeGallery({
           {generating ? <span className="loading loading-spinner loading-xs" /> : "Generate Recipe"}
         </button>
       </div>
+
+      {lastCreatedRecipeId && recipes.some((recipe) => recipe.id === lastCreatedRecipeId) && (
+        <div className="px-3 pt-3">
+          <div className="alert alert-success py-2 px-3 text-xs">
+            <div className="min-w-0">
+              <p className="font-medium">Saved recipe: {recipes.find((recipe) => recipe.id === lastCreatedRecipeId)?.title}</p>
+              <p className="text-success-content/70">
+                The newest recipe is selected below and stored in S3 under the user/date recipe folder.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn-success btn-xs"
+              onClick={() => setSelectedRecipeId(lastCreatedRecipeId)}
+            >
+              Open
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="p-3 space-y-3">
         {error && (
@@ -428,14 +462,19 @@ async function fetchRecipeMarkdown(s3Key: string): Promise<string> {
   return response.text();
 }
 
-function buildRecipeFileName(title: string, generatedAt: string): string {
+function buildRecipeFileName(title: string, generatedAt: string, userId: string): string {
   const slug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60) || "recipe";
-  const timestamp = generatedAt.replace(/[:.]/g, "-");
-  return `${timestamp}-${slug}.md`;
+  const timestamp = generatedAt.replace(/[:.]/g, "-").replace("T", "_").replace("Z", "");
+  const userPart = userId
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40) || "user";
+  return `${userPart}-${timestamp}-${slug}.md`;
 }
 
 function formatRecipeTimestamp(dateValue: string | null | undefined): string {
