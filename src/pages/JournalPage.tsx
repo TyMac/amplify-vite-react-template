@@ -8,6 +8,7 @@ import JournalEntryForm from "./JournalEntryForm";
 import { useTimezone } from "../contexts/TimezoneContext";
 import { batchColor } from "../services/coffeeBatch";
 import JournalPhotoGallery from "../components/JournalPhotoGallery";
+import JournalRecipeGallery from "../components/JournalRecipeGallery";
 
 const client = generateClient<Schema>();
 
@@ -68,6 +69,14 @@ export default function JournalPage() {
   });
   // Photo gallery section — open by default
   const [photoGalleryOpen, setPhotoGalleryOpen] = useState(true);
+  // Recipe section — open by default
+  const [recipeGalleryOpen, setRecipeGalleryOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem("journal_recipe_gallery_open");
+      if (saved !== null) return saved === "true";
+    } catch {}
+    return true;
+  });
   // Timeline panel — open by default on wide screens (≥1280px), collapsed on narrower
   const [timelineOpen, setTimelineOpen] = useState(() => {
     try {
@@ -110,6 +119,11 @@ export default function JournalPage() {
   useEffect(() => {
     try { localStorage.setItem("journal_timeline_open", String(timelineOpen)); } catch {}
   }, [timelineOpen]);
+
+  // Persist recipe section open/closed preference
+  useEffect(() => {
+    try { localStorage.setItem("journal_recipe_gallery_open", String(recipeGalleryOpen)); } catch {}
+  }, [recipeGalleryOpen]);
 
   // Handle pre-linked chat from URL
   useEffect(() => {
@@ -402,6 +416,33 @@ export default function JournalPage() {
                       />
                     )}
                   </div>
+
+                  {/* Recipes Section */}
+                  <div className="border-t border-base-200">
+                    <button
+                      onClick={() => setRecipeGalleryOpen(!recipeGalleryOpen)}
+                      className="w-full p-3 flex items-center justify-between hover:bg-base-200 transition-colors"
+                    >
+                      <h3 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">Recipes</h3>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`w-4 h-4 transition-transform ${recipeGalleryOpen ? "" : "-rotate-90"}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </button>
+                    {recipeGalleryOpen && (
+                      <JournalRecipeGallery
+                        journalEntry={selectedEntry}
+                        batch={selectedBatch}
+                        chatSessions={chatSessions}
+                        userId={user?.userId}
+                      />
+                    )}
+                  </div>
                 </div>
               </>
             ) : (
@@ -488,6 +529,33 @@ export default function JournalPage() {
                       <JournalPhotoGallery
                         chatSessions={chatSessions}
                         pinnedChatIds={selectedEntry?.chatSessionIds ?? []}
+                      />
+                    )}
+                  </div>
+
+                  {/* Recipes Section */}
+                  <div className="border-t border-base-200">
+                    <button
+                      onClick={() => setRecipeGalleryOpen(!recipeGalleryOpen)}
+                      className="w-full p-3 flex items-center justify-between hover:bg-base-200 transition-colors"
+                    >
+                      <h3 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">Recipes</h3>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className={`w-4 h-4 transition-transform ${recipeGalleryOpen ? "" : "-rotate-90"}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </button>
+                    {recipeGalleryOpen && (
+                      <JournalRecipeGallery
+                        journalEntry={selectedEntry}
+                        batch={selectedBatch}
+                        chatSessions={chatSessions}
+                        userId={user?.userId}
                       />
                     )}
                   </div>

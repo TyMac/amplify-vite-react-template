@@ -342,6 +342,29 @@ const schema = a.schema({
     ]),
 
   // ============================================
+  // GENERATED RECIPES - AI-generated brew recipes
+  // Stored as markdown in private S3 and indexed here for ownership/listing
+  // ============================================
+  GeneratedRecipe: a
+    .model({
+      userId: a.string().required(),
+      journalEntryId: a.string().required(),
+      sourceBatchId: a.string(),
+      chatSessionIds: a.string().array(),
+
+      title: a.string().required(),
+      recipeName: a.string().required(),
+      summary: a.string(),
+      fileName: a.string().required(),
+      s3Key: a.string().required(),
+
+      generatedAt: a.datetime(),
+      updatedAt: a.datetime(),
+    })
+    .secondaryIndexes((index) => [index("userId"), index("journalEntryId")])
+    .authorization((allow) => [allow.owner()]),
+
+  // ============================================
   // GEMINI AI - Custom queries via Lambda
   // ============================================
   geminiChat: a
