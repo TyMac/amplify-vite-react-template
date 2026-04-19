@@ -437,7 +437,7 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, errorMsg]);
       await chatStorage.addMessage(session.id, errorMsg);
-      return errorMsg.content;
+      return "";
     } finally {
       setLoading(false);
       inputRef.current?.focus();
@@ -778,6 +778,7 @@ export default function ChatPage() {
       </div>
 
       <LiveBrewCoachDock
+        sessionId={session?.id}
         sessionName={session?.name}
         messages={messages}
         equipmentPrompt={equipmentPrompt}

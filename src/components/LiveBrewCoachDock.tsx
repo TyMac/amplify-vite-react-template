@@ -7,6 +7,7 @@ import {
 } from "../services/gemini";
 
 interface LiveBrewCoachDockProps {
+  sessionId?: string;
   sessionName?: string;
   messages: ChatMessage[];
   equipmentPrompt?: string | null;
@@ -66,12 +67,21 @@ function stripDataUrlPrefix(dataUrl: string): string {
 }
 
 export default function LiveBrewCoachDock({
+  sessionId,
   sessionName,
   messages,
   equipmentPrompt,
   onSendMessage,
   onAppendMessage,
 }: LiveBrewCoachDockProps) {
+  const openKey = useMemo(
+    () => `barista_live_coach_open:${sessionId ?? "global"}`,
+    [sessionId]
+  );
+  const speakingKey = useMemo(
+    () => `barista_live_coach_speaking:${sessionId ?? "global"}`,
+    [sessionId]
+  );
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [listening, setListening] = useState(false);
@@ -93,6 +103,29 @@ export default function LiveBrewCoachDock({
     () => messages.slice(-8),
     [messages]
   );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedOpen = window.localStorage.getItem(openKey);
+    const storedSpeaking = window.localStorage.getItem(speakingKey);
+
+    if (storedOpen !== null) {
+      setOpen(storedOpen === "true");
+    }
+    if (storedSpeaking !== null) {
+      setSpeaking(storedSpeaking === "true");
+    }
+  }, [openKey, speakingKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(openKey, String(open));
+  }, [open, openKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(speakingKey, String(speaking));
+  }, [speaking, speakingKey]);
 
   useEffect(() => {
     return () => {
