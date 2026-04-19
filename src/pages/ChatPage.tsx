@@ -10,6 +10,7 @@ import {
 } from "../services/chatStorage";
 import { chatWithGemini, BARISTA_SYSTEM_PROMPT } from "../services/gemini";
 import { TagChip, TagEditor } from "../components/tags";
+import LiveBrewCoachDock from "../components/LiveBrewCoachDock";
 import { getCurrentUser } from "aws-amplify/auth";
 
 const client = generateClient<Schema>();
@@ -380,18 +381,26 @@ export default function ChatPage() {
     setRenamingId(null);
   }
 
-  async function sendMessage() {
-    if (!input.trim() || loading || !session) return;
+  async function appendMessageToSession(message: ChatMessage) {
+    if (!session) return;
+    setMessages((prev) => [...prev, message]);
+    await chatStorage.addMessage(session.id, message);
+  }
+
+  async function sendChatMessage(
+    content: string,
+    systemPromptOverride?: string | null
+  ): Promise<string> {
+    if (!content.trim() || loading || !session) return "";
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
       role: "user",
-      content: input.trim(),
+      content: content.trim(),
       timestamp: new Date().toISOString(),
     };
 
     setMessages((prev) => [...prev, userMsg]);
-    setInput("");
     setLoading(true);
 
     // Save user message
@@ -403,7 +412,10 @@ export default function ChatPage() {
         content: m.content,
       }));
 
-      const response = await chatWithGemini(allMessages, equipmentPrompt ?? undefined);
+      const response = await chatWithGemini(
+        allMessages,
+        systemPromptOverride ?? equipmentPrompt ?? undefined
+      );
 
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -414,6 +426,7 @@ export default function ChatPage() {
 
       setMessages((prev) => [...prev, assistantMsg]);
       await chatStorage.addMessage(session.id, assistantMsg);
+      return response;
     } catch (err) {
       console.error("Gemini error:", err);
       const errorMsg: ChatMessage = {
@@ -424,10 +437,18 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, errorMsg]);
       await chatStorage.addMessage(session.id, errorMsg);
+      return errorMsg.content;
     } finally {
       setLoading(false);
       inputRef.current?.focus();
     }
+  }
+
+  async function sendMessage() {
+    if (!input.trim() || loading || !session) return;
+    const content = input.trim();
+    setInput("");
+    await sendChatMessage(content);
   }
 
   function copyMessage(msg: ChatMessage) {
@@ -755,6 +776,14 @@ export default function ChatPage() {
           </p>
         </div>
       </div>
+
+      <LiveBrewCoachDock
+        sessionName={session?.name}
+        messages={messages}
+        equipmentPrompt={equipmentPrompt}
+        onSendMessage={sendChatMessage}
+        onAppendMessage={appendMessageToSession}
+      />
 
       {/* Rename modal (for header click rename) */}
       {renamingId === session?.id && !showSidebar && (

@@ -42,6 +42,77 @@ If asked about something outside your scope, respond with something like: "I'm a
 
 Remember: The goal is delicious coffee. If something isn't working, adjust and iterate.`;
 
+export const LIVE_BREW_COACH_SYSTEM_PROMPT = `You are Barista's live brew coach for an in-progress pour-over session.
+
+The user is actively brewing coffee and may be speaking, typing, or sharing a camera image.
+
+Your job:
+- Keep responses short, practical, and action-oriented.
+- Give one next step at a time when the brew is actively happening.
+- Use the existing chat context as the current session history.
+- Reference the user's saved equipment and preferences when available.
+- When the user shares an image, assess the setup and tell them what to do next.
+- Ask at most one clarifying question when you truly need it.
+- Prefer measurements in grams, seconds, and pour counts.
+- If the user is clearly done brewing, summarize the outcome and suggest a journal follow-up.
+
+Tone:
+- Calm, precise, and supportive.
+- Speak like a coach standing next to the brewer.
+- Avoid long theory dumps unless the user asks for them.
+
+If the user says something that is not about the active brew, gently steer them back to the session.`;
+
+export function buildLiveBrewCoachSystemPrompt(basePrompt?: string | null): string {
+  if (!basePrompt?.trim()) {
+    return LIVE_BREW_COACH_SYSTEM_PROMPT;
+  }
+  return `${LIVE_BREW_COACH_SYSTEM_PROMPT}\n\n${basePrompt.trim()}`;
+}
+
+export function buildLiveBrewVisionPrompt(context: {
+  sessionName?: string;
+  recentMessages: { role: "user" | "assistant"; content: string }[];
+  equipmentPrompt?: string | null;
+}): string {
+  const recentTranscript = context.recentMessages
+    .slice(-8)
+    .map((msg) => `- ${msg.role}: ${msg.content}`)
+    .join("\n");
+
+  const equipmentSection = context.equipmentPrompt?.trim()
+    ? `\nSaved equipment / preferences:\n${context.equipmentPrompt.trim()}\n`
+    : "";
+
+  return `${LIVE_BREW_COACH_SYSTEM_PROMPT}
+
+${context.sessionName ? `Session name: ${context.sessionName}\n` : ""}
+Recent transcript:
+${recentTranscript || "- (no prior messages in this session)"}
+${equipmentSection}
+
+Analyze the attached image as a live pour-over coaching check.
+Tell the user the most important observation first, then the next physical action to take.
+Keep the answer brief enough to read aloud.`;
+}
+
+export async function analyzeImageWithGemini(
+  imageBase64: string,
+  prompt?: string
+): Promise<string> {
+  const result = await client.queries.geminiVision({
+    imageBase64,
+    prompt: prompt || "Analyze this coffee setup and provide the most useful next brewing guidance.",
+  });
+
+  if (!result.data) {
+    throw new Error("No response from Gemini Vision API");
+  }
+
+  const parsed = JSON.parse(result.data);
+  return parsed.analysis as string;
+}
+
 export async function chatWithGemini(
   messages: { role: "user" | "assistant"; content: string }[],
   systemPrompt?: string
