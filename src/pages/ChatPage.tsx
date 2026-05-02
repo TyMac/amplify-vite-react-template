@@ -612,7 +612,7 @@ export default function ChatPage() {
             <button
               onClick={handleJournalButtonClick}
               className={`btn btn-sm gap-1 ${
-                linkedJournalEntry ? "btn-success" : "btn-ghost"
+                linkedJournalEntry ? "btn-success" : "btn-warning"
               }`}
             >
               <span>📔</span>
