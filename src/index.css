@@ -31,6 +31,8 @@
   --color-error-content: #FFFFFF;
   --color-success: #388E3C;
   --color-success-content: #FFFFFF;
+  --color-warning: #F4B400;
+  --color-warning-content: #1a1a1a;
   --radius-selector: 1rem;
   --radius-field: 0.75rem;
   --radius-box: 1rem;
@@ -58,6 +60,8 @@
   --color-error-content: #FFFFFF;
   --color-success: #66BB6A;
   --color-success-content: #FFFFFF;
+  --color-warning: #E0A800;
+  --color-warning-content: #1a1a1a;
   --radius-selector: 1rem;
   --radius-field: 0.75rem;
   --radius-box: 1rem;
