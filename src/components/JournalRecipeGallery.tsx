@@ -37,6 +37,7 @@ export default function JournalRecipeGallery({
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const linkedChats = useMemo(() => {
@@ -237,6 +238,25 @@ export default function JournalRecipeGallery({
     }
   }
 
+  async function handleDeleteRecipe(recipe: GeneratedRecipe) {
+    if (!window.confirm(`Delete "${recipe.title}"? This cannot be undone.`)) return;
+    setDeletingId(recipe.id);
+    setError(null);
+    try {
+      await client.models.GeneratedRecipe.delete({ id: recipe.id });
+      if (selectedRecipeId === recipe.id) {
+        setSelectedRecipeId(null);
+        setSelectedRecipeMarkdown(null);
+      }
+      await loadRecipes();
+    } catch (err) {
+      console.error("Failed to delete recipe", err);
+      setError("Unable to delete the recipe.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (!journalEntry) {
     return (
       <div className="p-3 border-t border-base-200">
@@ -333,17 +353,30 @@ export default function JournalRecipeGallery({
                       <p className="text-xs text-base-content/30">
                         {formatRecipeTimestamp(recipe.generatedAt ?? recipe.createdAt)}
                       </p>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleDownloadRecipe(recipe);
-                        }}
-                        disabled={downloadingId === recipe.id}
-                        className="btn btn-ghost btn-xs"
-                      >
-                        {downloadingId === recipe.id ? <span className="loading loading-spinner loading-xs" /> : "Download"}
-                      </button>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleDownloadRecipe(recipe);
+                          }}
+                          disabled={downloadingId === recipe.id || deletingId === recipe.id}
+                          className="btn btn-ghost btn-xs"
+                        >
+                          {downloadingId === recipe.id ? <span className="loading loading-spinner loading-xs" /> : "Download"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleDeleteRecipe(recipe);
+                          }}
+                          disabled={deletingId === recipe.id || downloadingId === recipe.id}
+                          className="btn btn-ghost btn-xs text-error hover:bg-error/10"
+                        >
+                          {deletingId === recipe.id ? <span className="loading loading-spinner loading-xs" /> : "Delete"}
+                        </button>
+                      </div>
                     </div>
                   </button>
                 );
