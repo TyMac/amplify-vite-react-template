@@ -277,15 +277,15 @@ export default function JournalRecipeGallery({
             <div className="min-w-0">
               <p className="font-medium">Saved recipe: {recipes.find((recipe) => recipe.id === lastCreatedRecipeId)?.title}</p>
               <p className="text-success-content/70">
-                The newest recipe is selected below and stored in S3 under the user/date recipe folder.
+                Recipe selected below — scroll down to preview.
               </p>
             </div>
             <button
               type="button"
               className="btn btn-success btn-xs"
-              onClick={() => setSelectedRecipeId(lastCreatedRecipeId)}
+              onClick={() => setLastCreatedRecipeId(null)}
             >
-              Open
+              Dismiss
             </button>
           </div>
         </div>
@@ -316,7 +316,7 @@ export default function JournalRecipeGallery({
                   <button
                     key={recipe.id}
                     onClick={() => setSelectedRecipeId(recipe.id)}
-                    className={`text-left rounded-lg border bg-base-100 p-3 transition-all hover:border-primary/40 hover:shadow-sm ${isSelected ? "border-primary/50 ring-1 ring-primary/20" : "border-base-200"}`}
+                    className={`w-full min-w-0 overflow-hidden text-left rounded-lg border bg-base-100 p-3 transition-all hover:border-primary/40 hover:shadow-sm ${isSelected ? "border-primary/50 ring-1 ring-primary/20" : "border-base-200"}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
