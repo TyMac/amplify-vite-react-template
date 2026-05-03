@@ -11,6 +11,8 @@ const WORKLOAD_PROVIDER_ID = process.env.WORKLOAD_PROVIDER_ID || 'aws-lambda';
 const SERVICE_ACCOUNT_EMAIL = process.env.SERVICE_ACCOUNT_EMAIL || 'barista-vertex-ai@deductive-jet-464913-p8.iam.gserviceaccount.com';
 const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-south1';
 const RAG_LOCATION = process.env.RAG_LOCATION || 'us-south1';
+// Gemma models are only available in us-central1 on Vertex AI
+const GEMMA_LOCATION = process.env.GEMMA_LOCATION || 'us-central1';
 const RAG_CORPUS = process.env.RAG_CORPUS || 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904';
 
 // Construct the workload identity provider path
@@ -56,9 +58,10 @@ async function getGCPClient() {
 /**
  * Call Vertex AI Gemini API
  */
-async function callVertexAI(endpoint: string, payload: any): Promise<any> {
+async function callVertexAI(endpoint: string, payload: any, location?: string): Promise<any> {
   const client = await getGCPClient();
-  const url = `https://${VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${VERTEX_LOCATION}/${endpoint}`;
+  const loc = location || VERTEX_LOCATION;
+  const url = `https://${loc}-aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${loc}/${endpoint}`;
 
   const response = await client.request({
     url,
@@ -219,7 +222,7 @@ Use the above data in your response. Now follow the general instructions below.
 
   try {
     console.log(`Using model: ${model}`);
-    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
+    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload, GEMMA_LOCATION);
 
     const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
     
@@ -337,7 +340,7 @@ Return ONLY the JSON object, no markdown, no explanation.`;
   };
 
   try {
-    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
+    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload, GEMMA_LOCATION);
     const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
 
     // Try to parse the JSON response
