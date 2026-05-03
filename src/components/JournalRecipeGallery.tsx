@@ -30,15 +30,17 @@ export default function JournalRecipeGallery({
   const effectiveUserId = userId ?? user?.userId;
 
   const [recipes, setRecipes] = useState<GeneratedRecipe[]>([]);
-  const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
-  const [selectedRecipeMarkdown, setSelectedRecipeMarkdown] = useState<string | null>(null);
   const [lastCreatedRecipeId, setLastCreatedRecipeId] = useState<string | null>(null);
-  const [previewLoading, setPreviewLoading] = useState(false);
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Modal state
+  const [modalRecipe, setModalRecipe] = useState<GeneratedRecipe | null>(null);
+  const [modalMarkdown, setModalMarkdown] = useState<string | null>(null);
+  const [modalLoading, setModalLoading] = useState(false);
 
   const linkedChats = useMemo(() => {
     if (!journalEntry?.chatSessionIds || journalEntry.chatSessionIds.length === 0) {
@@ -53,8 +55,6 @@ export default function JournalRecipeGallery({
   useEffect(() => {
     if (!journalEntry?.id) {
       setRecipes([]);
-      setSelectedRecipeId(null);
-      setSelectedRecipeMarkdown(null);
       setLastCreatedRecipeId(null);
       return;
     }
@@ -62,54 +62,29 @@ export default function JournalRecipeGallery({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [journalEntry?.id, effectiveUserId]);
 
+  // Load markdown when modal opens
   useEffect(() => {
-    if (recipes.length === 0) {
-      setSelectedRecipeId(null);
-      setSelectedRecipeMarkdown(null);
+    if (!modalRecipe) {
+      setModalMarkdown(null);
       return;
     }
-
-    if (!selectedRecipeId || !recipes.some((recipe) => recipe.id === selectedRecipeId)) {
-      setSelectedRecipeId(recipes[0].id);
-    }
-  }, [recipes, selectedRecipeId]);
-
-  useEffect(() => {
     let cancelled = false;
+    setModalLoading(true);
+    fetchRecipeMarkdown(modalRecipe.s3Key)
+      .then((md) => { if (!cancelled) setModalMarkdown(md); })
+      .catch(() => { if (!cancelled) setModalMarkdown(null); })
+      .finally(() => { if (!cancelled) setModalLoading(false); });
+    return () => { cancelled = true; };
+  }, [modalRecipe]);
 
-    async function run() {
-      if (!selectedRecipeId) {
-        setSelectedRecipeMarkdown(null);
-        return;
-      }
-      const recipe = recipes.find((item) => item.id === selectedRecipeId);
-      if (!recipe) {
-        setSelectedRecipeMarkdown(null);
-        return;
-      }
-      setPreviewLoading(true);
-      try {
-        const markdown = await fetchRecipeMarkdown(recipe.s3Key);
-        if (!cancelled) {
-          setSelectedRecipeMarkdown(markdown);
-        }
-      } catch (err) {
-        console.error("Failed to load recipe preview", err);
-        if (!cancelled) {
-          setSelectedRecipeMarkdown(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setPreviewLoading(false);
-        }
-      }
+  // Close modal on Escape
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setModalRecipe(null);
     }
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [recipes, selectedRecipeId]);
+    if (modalRecipe) window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [modalRecipe]);
 
   async function loadRecipes(preferredRecipeId?: string) {
     if (!journalEntry?.id) return;
@@ -127,15 +102,11 @@ export default function JournalRecipeGallery({
         return right.localeCompare(left);
       });
       setRecipes(sorted);
-      setSelectedRecipeId((current) => {
-        if (preferredRecipeId && sorted.some((recipe) => recipe.id === preferredRecipeId)) {
-          return preferredRecipeId;
-        }
-        if (current && sorted.some((recipe) => recipe.id === current)) {
-          return current;
-        }
-        return sorted[0]?.id ?? null;
-      });
+      // Auto-open modal for newly generated recipe
+      if (preferredRecipeId) {
+        const newRecipe = sorted.find((r) => r.id === preferredRecipeId);
+        if (newRecipe) setModalRecipe(newRecipe);
+      }
     } catch (err) {
       console.error("Failed to load recipes", err);
       setError("Unable to load generated recipes.");
@@ -173,9 +144,7 @@ export default function JournalRecipeGallery({
 
       const uploadTask = uploadData({
         path: ({ identityId }) => {
-          if (!identityId) {
-            throw new Error("Missing storage identity");
-          }
+          if (!identityId) throw new Error("Missing storage identity");
           return `private/${identityId}/recipes/${effectiveUserId}/${generatedDateKey}/${fileName}`;
         },
         data: new Blob([recipeMarkdown], { type: "text/markdown;charset=utf-8" }),
@@ -194,9 +163,7 @@ export default function JournalRecipeGallery({
         summary: draft.overview,
         generatedAt,
       };
-      if (batch?.id) {
-        recipeRecord.sourceBatchId = batch.id;
-      }
+      if (batch?.id) recipeRecord.sourceBatchId = batch.id;
 
       const { data: createdRecipe } = await client.models.GeneratedRecipe.create(recipeRecord as any);
       setLastCreatedRecipeId(createdRecipe?.id ?? null);
@@ -218,9 +185,7 @@ export default function JournalRecipeGallery({
         options: { expiresIn: 3600, validateObjectExistence: false },
       });
       const response = await fetch(url.toString());
-      if (!response.ok) {
-        throw new Error(`Download failed (${response.status})`);
-      }
+      if (!response.ok) throw new Error(`Download failed (${response.status})`);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
@@ -244,10 +209,7 @@ export default function JournalRecipeGallery({
     setError(null);
     try {
       await client.models.GeneratedRecipe.delete({ id: recipe.id });
-      if (selectedRecipeId === recipe.id) {
-        setSelectedRecipeId(null);
-        setSelectedRecipeMarkdown(null);
-      }
+      if (modalRecipe?.id === recipe.id) setModalRecipe(null);
       await loadRecipes();
     } catch (err) {
       console.error("Failed to delete recipe", err);
@@ -268,212 +230,169 @@ export default function JournalRecipeGallery({
   }
 
   const linkedChatCount = linkedChats.length;
-  const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId) ?? null;
 
   return (
-    <div className="border-t border-base-200">
-      <div className="p-3 border-b border-base-200 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
-            Recipes
-          </h3>
-          <p className="text-xs text-base-content/40 mt-1">
-            {recipes.length} saved recipe{recipes.length === 1 ? "" : "s"}
-            {linkedChatCount > 0 ? ` • ${linkedChatCount} linked chat${linkedChatCount === 1 ? "" : "s"}` : ""}
-          </p>
+    <>
+      <div className="border-t border-base-200">
+        <div className="p-3 border-b border-base-200 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
+              Recipes
+            </h3>
+            <p className="text-xs text-base-content/40 mt-1">
+              {recipes.length} saved recipe{recipes.length === 1 ? "" : "s"}
+              {linkedChatCount > 0 ? ` • ${linkedChatCount} linked chat${linkedChatCount === 1 ? "" : "s"}` : ""}
+            </p>
+          </div>
+          <button
+            onClick={handleGenerateRecipe}
+            disabled={generating || loadingRecipes}
+            className="btn btn-primary btn-xs whitespace-nowrap"
+          >
+            {generating ? <span className="loading loading-spinner loading-xs" /> : "Generate Recipe"}
+          </button>
         </div>
-        <button
-          onClick={handleGenerateRecipe}
-          disabled={generating || loadingRecipes}
-          className="btn btn-primary btn-xs whitespace-nowrap"
-        >
-          {generating ? <span className="loading loading-spinner loading-xs" /> : "Generate Recipe"}
-        </button>
+
+        {lastCreatedRecipeId && recipes.some((r) => r.id === lastCreatedRecipeId) && (
+          <div className="px-3 pt-3">
+            <div className="alert alert-success py-2 px-3 text-xs">
+              <div className="min-w-0">
+                <p className="font-medium">Saved: {recipes.find((r) => r.id === lastCreatedRecipeId)?.title}</p>
+                <p className="text-success-content/70">Opening preview now.</p>
+              </div>
+              <button type="button" className="btn btn-success btn-xs" onClick={() => setLastCreatedRecipeId(null)}>
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="p-3 space-y-2">
+          {error && (
+            <div className="alert alert-error py-2 px-3 text-xs">
+              <span>{error}</span>
+            </div>
+          )}
+
+          {loadingRecipes ? (
+            <div className="flex justify-center py-6">
+              <span className="loading loading-spinner loading-sm text-primary" />
+            </div>
+          ) : recipes.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-base-300 bg-base-100/50 p-3 text-xs text-base-content/50 space-y-1">
+              <p>No recipes generated yet.</p>
+              <p>Generate one from this journal and its linked chats.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {recipes.map((recipe) => (
+                <button
+                  key={recipe.id}
+                  onClick={() => setModalRecipe(recipe)}
+                  className="w-full min-w-0 text-left rounded-lg border border-base-200 bg-base-100 p-3 transition-all hover:border-primary/40 hover:shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{recipe.title}</p>
+                      <p className="text-xs text-base-content/40 mt-0.5 line-clamp-2">
+                        {recipe.summary || recipe.recipeName}
+                      </p>
+                    </div>
+                    <span className="badge badge-xs badge-outline flex-shrink-0">View</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <p className="text-xs text-base-content/30">
+                      {formatRecipeTimestamp(recipe.generatedAt ?? recipe.createdAt)}
+                    </p>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); void handleDownloadRecipe(recipe); }}
+                        disabled={downloadingId === recipe.id || deletingId === recipe.id}
+                        className="btn btn-ghost btn-xs"
+                      >
+                        {downloadingId === recipe.id ? <span className="loading loading-spinner loading-xs" /> : "Download"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); void handleDeleteRecipe(recipe); }}
+                        disabled={deletingId === recipe.id || downloadingId === recipe.id}
+                        className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
+                        title="Delete recipe"
+                      >
+                        {deletingId === recipe.id ? (
+                          <span className="loading loading-spinner loading-xs" />
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                            <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {lastCreatedRecipeId && recipes.some((recipe) => recipe.id === lastCreatedRecipeId) && (
-        <div className="px-3 pt-3">
-          <div className="alert alert-success py-2 px-3 text-xs">
-            <div className="min-w-0">
-              <p className="font-medium">Saved recipe: {recipes.find((recipe) => recipe.id === lastCreatedRecipeId)?.title}</p>
-              <p className="text-success-content/70">
-                Recipe selected below — scroll down to preview.
-              </p>
+      {/* Recipe Modal */}
+      {modalRecipe && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setModalRecipe(null)}
+        >
+          <div
+            className="bg-base-100 rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-start justify-between gap-3 p-4 border-b border-base-200">
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-semibold truncate">{modalRecipe.title}</h2>
+                <p className="text-xs text-base-content/40 mt-0.5">
+                  {formatRecipeTimestamp(modalRecipe.generatedAt ?? modalRecipe.createdAt)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => void handleDownloadRecipe(modalRecipe)}
+                  disabled={downloadingId === modalRecipe.id}
+                  className="btn btn-primary btn-sm"
+                >
+                  {downloadingId === modalRecipe.id ? <span className="loading loading-spinner loading-xs" /> : "Download"}
+                </button>
+                <button
+                  onClick={() => setModalRecipe(null)}
+                  className="btn btn-ghost btn-sm btn-square"
+                  title="Close"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                    <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                  </svg>
+                </button>
+              </div>
             </div>
-            <button
-              type="button"
-              className="btn btn-success btn-xs"
-              onClick={() => setLastCreatedRecipeId(null)}
-            >
-              Dismiss
-            </button>
+
+            {/* Modal body */}
+            <div className="flex-1 overflow-auto p-4">
+              {modalLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <span className="loading loading-spinner loading-md text-primary" />
+                </div>
+              ) : modalMarkdown ? (
+                <pre className="whitespace-pre-wrap text-sm leading-6 text-base-content/80 font-mono">{modalMarkdown}</pre>
+              ) : (
+                <div className="flex items-center justify-center py-16 text-sm text-base-content/40">
+                  Unable to load recipe content.
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
-
-      <div className="p-3 space-y-3">
-        {error && (
-          <div className="alert alert-error py-2 px-3 text-xs">
-            <span>{error}</span>
-          </div>
-        )}
-
-        {loadingRecipes ? (
-          <div className="flex justify-center py-6">
-            <span className="loading loading-spinner loading-sm text-primary" />
-          </div>
-        ) : recipes.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-base-300 bg-base-100/50 p-3 text-xs text-base-content/50 space-y-1">
-            <p>No recipes generated yet.</p>
-            <p>Generate one from this journal and its linked chats.</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-2">
-              {recipes.map((recipe) => {
-                const isSelected = recipe.id === selectedRecipeId;
-                return (
-                  <button
-                    key={recipe.id}
-                    onClick={() => setSelectedRecipeId(recipe.id)}
-                    className={`w-full min-w-0 text-left rounded-lg border bg-base-100 p-3 transition-all hover:border-primary/40 hover:shadow-sm ${isSelected ? "border-primary/50 ring-1 ring-primary/20" : "border-base-200"}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{recipe.title}</p>
-                        <p className="text-xs text-base-content/40 mt-0.5 line-clamp-2">
-                          {recipe.summary || recipe.recipeName}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span className="badge badge-xs badge-outline">{isSelected ? "Selected" : "Preview"}</span>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between gap-2">
-                      <p className="text-xs text-base-content/30">
-                        {formatRecipeTimestamp(recipe.generatedAt ?? recipe.createdAt)}
-                      </p>
-                      <div className="flex gap-1">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleDownloadRecipe(recipe);
-                          }}
-                          disabled={downloadingId === recipe.id || deletingId === recipe.id}
-                          className="btn btn-ghost btn-xs"
-                        >
-                          {downloadingId === recipe.id ? <span className="loading loading-spinner loading-xs" /> : "Download"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleDeleteRecipe(recipe);
-                          }}
-                          disabled={deletingId === recipe.id || downloadingId === recipe.id}
-                          className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
-                          title="Delete recipe"
-                        >
-                          {deletingId === recipe.id ? (
-                            <span className="loading loading-spinner loading-xs" />
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-                              <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-
-            {selectedRecipe && (
-              <div className="rounded-lg border border-base-200 bg-base-100 p-3">
-                <RecipePreview
-                  recipe={selectedRecipe}
-                  markdown={selectedRecipeMarkdown}
-                  loading={previewLoading}
-                  onDownload={handleDownloadRecipe}
-                />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RecipePreview({
-  recipe,
-  markdown,
-  loading,
-  onDownload,
-}: {
-  recipe: GeneratedRecipe;
-  markdown: string | null;
-  loading: boolean;
-  onDownload: (recipe: GeneratedRecipe) => Promise<void>;
-}) {
-  return (
-    <div className="space-y-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h4 className="text-sm font-semibold truncate">{recipe.title}</h4>
-          <p className="text-xs text-base-content/40 mt-1 line-clamp-3">
-            {recipe.summary || recipe.recipeName}
-          </p>
-        </div>
-        <button
-          onClick={() => void onDownload(recipe)}
-          disabled={!recipe.s3Key}
-          className="btn btn-primary btn-xs flex-shrink-0"
-        >
-          Download
-        </button>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <RecipeMeta label="Generated" value={formatRecipeTimestamp(recipe.generatedAt ?? recipe.createdAt)} />
-        <RecipeMeta label="Journal" value={recipe.journalEntryId} mono />
-        <RecipeMeta label="File" value={recipe.fileName} mono />
-        <RecipeMeta label="Source" value={recipe.sourceBatchId ?? "Journal-linked"} />
-      </div>
-
-      <div className="rounded-lg border border-base-200 bg-base-200/30 p-3 overflow-auto max-h-96">
-        {loading ? (
-          <div className="flex h-full items-center justify-center">
-            <span className="loading loading-spinner loading-sm text-primary" />
-          </div>
-        ) : markdown ? (
-          <pre className="whitespace-pre-wrap text-xs leading-5 text-base-content/80 font-mono">{markdown}</pre>
-        ) : (
-          <div className="flex h-full items-center justify-center text-xs text-base-content/40">
-            Preview unavailable.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RecipeMeta({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value: string;
-  mono?: boolean;
-}) {
-  return (
-    <div className="rounded-md border border-base-200 bg-base-100 p-2 min-w-0">
-      <p className="text-[10px] uppercase tracking-widest text-base-content/40">{label}</p>
-      <p className={`mt-1 truncate ${mono ? "font-mono text-[11px]" : "text-xs"}`}>{value || "—"}</p>
-    </div>
+    </>
   );
 }
 
@@ -490,24 +409,14 @@ async function fetchRecipeMarkdown(s3Key: string): Promise<string> {
     options: { expiresIn: 3600, validateObjectExistence: false },
   });
   const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`Preview failed (${response.status})`);
-  }
+  if (!response.ok) throw new Error(`Preview failed (${response.status})`);
   return response.text();
 }
 
 function buildRecipeFileName(title: string, generatedAt: string, userId: string): string {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60) || "recipe";
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60) || "recipe";
   const timestamp = generatedAt.replace(/[:.]/g, "-").replace("T", "_").replace("Z", "");
-  const userPart = userId
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40) || "user";
+  const userPart = userId.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "user";
   return `${userPart}-${timestamp}-${slug}.md`;
 }
 
