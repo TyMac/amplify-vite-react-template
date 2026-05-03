@@ -163,11 +163,7 @@ export default function ChatPage() {
 
   // Resolve S3 presigned URLs for messages with imageKey
   useEffect(() => {
-    const withImages = messages.filter((m) => m.imageKey);
-    const unresolved = withImages.filter((m) => !imageUrls[m.id]);
-    if (withImages.length > 0) {
-      console.log("[ChatPage] Messages with imageKey:", withImages.map(m => ({ id: m.id, imageKey: m.imageKey, content: m.content })));
-    }
+    const unresolved = messages.filter((m) => m.imageKey && !imageUrls[m.id]);
     if (unresolved.length === 0) return;
     (async () => {
       const resolved: Record<string, string> = {};
@@ -179,7 +175,7 @@ export default function ChatPage() {
           });
           resolved[msg.id] = url.toString();
         } catch (err) {
-          console.error("[ChatPage] getUrl failed for", msg.id, "key:", msg.imageKey, err);
+          console.warn("Failed to resolve image URL for", msg.id, err);
         }
       }
       if (Object.keys(resolved).length > 0) {
@@ -279,9 +275,6 @@ export default function ChatPage() {
         setSession(s);
         setMessages(s.messages);
         setTags(s.tags ?? []);
-        const imgMsgs = s.messages.filter((m: any) => m.imageKey);
-        if (imgMsgs.length > 0) console.log("[ChatPage] Loaded session has", imgMsgs.length, "messages with imageKey:", imgMsgs.map((m: any) => m.imageKey));
-        else console.log("[ChatPage] Loaded session, no imageKey messages found. Total messages:", s.messages.length);
         return;
       }
     }
