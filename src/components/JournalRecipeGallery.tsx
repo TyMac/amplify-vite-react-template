@@ -5,7 +5,7 @@ import { getUrl, uploadData } from "aws-amplify/storage";
 import type { Schema } from "../../amplify/data/resource";
 import { generateRecipeDraft, renderRecipeMarkdown } from "../services/recipeGeneration";
 
-const client = generateClient<Schema>();
+const client = generateClient<Schema>({ authMode: "userPool" });
 
 type JournalEntry = Schema["BrewJournal"]["type"];
 type CoffeeBatch = Schema["CoffeeBatch"]["type"];
