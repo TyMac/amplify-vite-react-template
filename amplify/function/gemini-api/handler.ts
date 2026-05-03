@@ -206,7 +206,7 @@ Use the above data in your response. Now follow the general instructions below.
     contents,
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 4096,
       topP: 0.95,
     },
   };
