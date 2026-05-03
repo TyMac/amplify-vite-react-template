@@ -192,7 +192,6 @@ export default function JournalRecipeGallery({
         s3Key: uploadResult.path,
         summary: draft.overview,
         generatedAt,
-        updatedAt: generatedAt,
       };
       if (batch?.id) {
         recipeRecord.sourceBatchId = batch.id;

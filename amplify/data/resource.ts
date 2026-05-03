@@ -359,7 +359,6 @@ const schema = a.schema({
       s3Key: a.string().required(),
 
       generatedAt: a.datetime(),
-      updatedAt: a.datetime(),
     })
     .secondaryIndexes((index) => [index("userId"), index("journalEntryId")])
     .authorization((allow) => [allow.owner()]),
