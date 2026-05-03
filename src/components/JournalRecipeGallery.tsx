@@ -308,7 +308,7 @@ export default function JournalRecipeGallery({
             <p>Generate one from this journal and its linked chats.</p>
           </div>
         ) : (
-          <div className="grid gap-3 xl:grid-cols-[1fr_1.25fr]">
+          <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-2">
               {recipes.map((recipe) => {
                 const isSelected = recipe.id === selectedRecipeId;
@@ -316,18 +316,17 @@ export default function JournalRecipeGallery({
                   <button
                     key={recipe.id}
                     onClick={() => setSelectedRecipeId(recipe.id)}
-                    className={`w-full min-w-0 overflow-hidden text-left rounded-lg border bg-base-100 p-3 transition-all hover:border-primary/40 hover:shadow-sm ${isSelected ? "border-primary/50 ring-1 ring-primary/20" : "border-base-200"}`}
+                    className={`w-full min-w-0 text-left rounded-lg border bg-base-100 p-3 transition-all hover:border-primary/40 hover:shadow-sm ${isSelected ? "border-primary/50 ring-1 ring-primary/20" : "border-base-200"}`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium truncate">{recipe.title}</p>
-                        <p className="text-xs text-base-content/40 mt-0.5 truncate">
+                        <p className="text-xs text-base-content/40 mt-0.5 line-clamp-2">
                           {recipe.summary || recipe.recipeName}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <span className="badge badge-xs badge-outline">Preview</span>
-                        {downloadingId === recipe.id && <span className="loading loading-spinner loading-xs" />}
+                        <span className="badge badge-xs badge-outline">{isSelected ? "Selected" : "Preview"}</span>
                       </div>
                     </div>
                     <div className="mt-2 flex items-center justify-between gap-2">
@@ -343,7 +342,7 @@ export default function JournalRecipeGallery({
                         disabled={downloadingId === recipe.id}
                         className="btn btn-ghost btn-xs"
                       >
-                        Download
+                        {downloadingId === recipe.id ? <span className="loading loading-spinner loading-xs" /> : "Download"}
                       </button>
                     </div>
                   </button>
@@ -351,20 +350,16 @@ export default function JournalRecipeGallery({
               })}
             </div>
 
-            <div className="rounded-lg border border-base-200 bg-base-100 p-3 min-h-72">
-              {selectedRecipe ? (
+            {selectedRecipe && (
+              <div className="rounded-lg border border-base-200 bg-base-100 p-3">
                 <RecipePreview
                   recipe={selectedRecipe}
                   markdown={selectedRecipeMarkdown}
                   loading={previewLoading}
                   onDownload={handleDownloadRecipe}
                 />
-              ) : (
-                <div className="flex h-full items-center justify-center text-xs text-base-content/40">
-                  Select a recipe to preview it here.
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -384,11 +379,11 @@ function RecipePreview({
   onDownload: (recipe: GeneratedRecipe) => Promise<void>;
 }) {
   return (
-    <div className="space-y-3 h-full flex flex-col">
+    <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold truncate">{recipe.title}</h4>
-          <p className="text-xs text-base-content/40 mt-1">
+          <p className="text-xs text-base-content/40 mt-1 line-clamp-3">
             {recipe.summary || recipe.recipeName}
           </p>
         </div>
@@ -408,7 +403,7 @@ function RecipePreview({
         <RecipeMeta label="Source" value={recipe.sourceBatchId ?? "Journal-linked"} />
       </div>
 
-      <div className="flex-1 min-h-0 rounded-lg border border-base-200 bg-base-200/30 p-3 overflow-auto">
+      <div className="rounded-lg border border-base-200 bg-base-200/30 p-3 overflow-auto max-h-96">
         {loading ? (
           <div className="flex h-full items-center justify-center">
             <span className="loading loading-spinner loading-sm text-primary" />
