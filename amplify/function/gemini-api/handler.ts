@@ -240,7 +240,7 @@ Use the above data in your response. Now follow the general instructions below.
 async function geminiVision(args: { imageBase64: string; prompt?: string }) {
   const { imageBase64, prompt = 'What kind of coffee beans or equipment is in this image? Provide details about origin, roast level, grinder type, or any other relevant information.' } = args;
 
-  const result = await callVertexAI('publishers/google/models/gemma-4-27b-it:generateContent', {
+  const result = await callVertexAI('publishers/google/models/gemini-2.0-flash-001:generateContent', {
     contents: [
       {
         role: 'user',
