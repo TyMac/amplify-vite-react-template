@@ -23,7 +23,7 @@ export function getTagColor(tag: string): string {
 
 // Suggested tags grouped by category
 export const TAG_SUGGESTIONS: Record<string, string[]> = {
-  Roasters: ["Leuchtfeuer", "SEY", "Apollon's Gold", "Coffea Circulor", "Black & White Coffee Roasters", "Datura", "Kin Coffee", "Counter Culture"],
+  Roasters: ["Leuchtfeuer", "SEY", "Apollon's Gold", "Coffea Circulor", "Black & White Coffee Roasters", "Datura", "Kin Coffee", "Counter Culture", "Savage Coffees"],
   Producers: [
     "William Ortiz", "Jamison Savage", "Diego Parra", "Tamiru Tadesse Tesema",
     "Jhonatan Pito", "Bukeye", "Reinaldo Chilito",
