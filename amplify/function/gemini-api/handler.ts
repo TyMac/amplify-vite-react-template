@@ -324,7 +324,7 @@ async function analyzeImageWithGemma4(imageBase64: string, prompt: string) {
   const result = await callVertexOpenAI({
     model: GEMMA4_MAAS_MODEL,
     stream: false,
-    max_tokens: 1024,
+    max_tokens: 512,
     messages: [
       {
         role: 'user',
@@ -340,7 +340,7 @@ async function analyzeImageWithGemma4(imageBase64: string, prompt: string) {
       },
     ],
     chat_template_kwargs: {
-      enable_thinking: true,
+      enable_thinking: false,
     },
   });
 
