@@ -14,6 +14,9 @@ export const geminiApi = defineFunction({
     SERVICE_ACCOUNT_EMAIL:
       "barista-vertex-ai@deductive-jet-464913-p8.iam.gserviceaccount.com",
     VERTEX_LOCATION: "us-south1",
+    VERTEX_OPENAI_LOCATION: "global",
+    VISION_MODEL_PROVIDER: "gemma4",
+    GEMMA4_MAAS_MODEL: "google/gemma-4-26b-a4b-it-maas",
     // RAG_CORPUS_ID: 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904',
   },
 });

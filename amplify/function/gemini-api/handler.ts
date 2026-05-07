@@ -10,8 +10,11 @@ const WORKLOAD_POOL_ID = process.env.WORKLOAD_POOL_ID || 'aws-barista';
 const WORKLOAD_PROVIDER_ID = process.env.WORKLOAD_PROVIDER_ID || 'aws-lambda';
 const SERVICE_ACCOUNT_EMAIL = process.env.SERVICE_ACCOUNT_EMAIL || 'barista-vertex-ai@deductive-jet-464913-p8.iam.gserviceaccount.com';
 const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-south1';
+const VERTEX_OPENAI_LOCATION = process.env.VERTEX_OPENAI_LOCATION || 'global';
 const RAG_LOCATION = process.env.RAG_LOCATION || 'us-south1';
 const RAG_CORPUS = process.env.RAG_CORPUS || 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904';
+const VISION_MODEL_PROVIDER = process.env.VISION_MODEL_PROVIDER || 'gemini';
+const GEMMA4_MAAS_MODEL = process.env.GEMMA4_MAAS_MODEL || 'google/gemma-4-26b-a4b-it-maas';
 
 const EQUIPMENT_COMPARISON_RULES = `EQUIPMENT COMPARISON RULES:
 - When comparing equipment flow rates, never produce a ranked list unless every item's relative position is explicitly supported by retrieved context or the canonical rules below.
@@ -76,6 +79,44 @@ async function callVertexAI(endpoint: string, payload: any, location?: string): 
   } as any);
 
   return response.data;
+}
+
+/**
+ * Call Vertex AI's OpenAI-compatible endpoint (used by Gemma 4 MaaS).
+ */
+async function callVertexOpenAI(payload: any): Promise<any> {
+  const client = await getGCPClient();
+  const url = `https://aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${VERTEX_OPENAI_LOCATION}/endpoints/openapi/chat/completions`;
+
+  const response = await client.request({
+    url,
+    method: 'POST',
+    data: payload,
+  } as any);
+
+  return response.data;
+}
+
+function extractOpenAIText(result: any): string {
+  const content = result?.choices?.[0]?.message?.content ?? result?.choices?.[0]?.text;
+
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (typeof part === 'string') return part;
+        if (typeof part?.text === 'string') return part.text;
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+
+  return '';
 }
 
 /**
@@ -245,11 +286,9 @@ Use the above data in your response. Now follow the general instructions below.
 }
 
 /**
- * Analyze image with Gemini Vision
+ * Analyze image with Gemini Vision.
  */
-async function geminiVision(args: { imageBase64: string; prompt?: string }) {
-  const { imageBase64, prompt = 'What kind of coffee beans or equipment is in this image? Provide details about origin, roast level, grinder type, or any other relevant information.' } = args;
-
+async function analyzeImageWithGeminiFlash(imageBase64: string, prompt: string) {
   const result = await callVertexAI('publishers/google/models/gemini-2.0-flash-001:generateContent', {
     contents: [
       {
@@ -271,12 +310,68 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
     },
   });
 
-  const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'Could not analyze image';
-
-  return JSON.stringify({
-    analysis: responseText,
+  return {
+    analysis: result.candidates?.[0]?.content?.parts?.[0]?.text || 'Could not analyze image',
     tokensUsed: result.usageMetadata?.totalTokenCount || 0,
+    modelUsed: 'gemini-2.0-flash-001',
+  };
+}
+
+/**
+ * Analyze image with Gemma 4 MaaS via Vertex AI's OpenAI-compatible endpoint.
+ */
+async function analyzeImageWithGemma4(imageBase64: string, prompt: string) {
+  const result = await callVertexOpenAI({
+    model: GEMMA4_MAAS_MODEL,
+    stream: false,
+    max_tokens: 1024,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: prompt },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:image/jpeg;base64,${imageBase64}`,
+            },
+          },
+        ],
+      },
+    ],
+    chat_template_kwargs: {
+      enable_thinking: true,
+    },
   });
+
+  return {
+    analysis: extractOpenAIText(result) || 'Could not analyze image',
+    tokensUsed: result.usage?.total_tokens || 0,
+    modelUsed: GEMMA4_MAAS_MODEL,
+  };
+}
+
+/**
+ * Analyze image with the configured vision provider. Gemma 4 is experimental, so
+ * fall back to Gemini Flash if Gemma errors or returns an empty response.
+ */
+async function geminiVision(args: { imageBase64: string; prompt?: string }) {
+  const { imageBase64, prompt = 'What kind of coffee beans or equipment is in this image? Provide details about origin, roast level, grinder type, or any other relevant information.' } = args;
+
+  if (VISION_MODEL_PROVIDER === 'gemma4') {
+    try {
+      const gemmaResult = await analyzeImageWithGemma4(imageBase64, prompt);
+      if (gemmaResult.analysis && gemmaResult.analysis !== 'Could not analyze image') {
+        return JSON.stringify(gemmaResult);
+      }
+      console.warn('Gemma 4 vision returned empty analysis; falling back to Gemini Flash');
+    } catch (error: any) {
+      console.error('Gemma 4 vision failed; falling back to Gemini Flash:', error.message);
+    }
+  }
+
+  const geminiResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+  return JSON.stringify(geminiResult);
 }
 
 /**
