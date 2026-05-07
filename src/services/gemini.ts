@@ -116,6 +116,16 @@ export async function analyzeImageWithGemini(
   }
 
   const parsed = JSON.parse(result.data);
+  console.info("Vision analysis model debug", {
+    requestedProvider: parsed.requestedProvider,
+    providerUsed: parsed.providerUsed,
+    modelUsed: parsed.modelUsed,
+    fallbackUsed: parsed.fallbackUsed,
+    fallbackReason: parsed.fallbackReason,
+    tokensUsed: parsed.tokensUsed,
+    latencyMs: parsed.latencyMs,
+    providerLatencyMs: parsed.providerLatencyMs,
+  });
   return parsed.analysis as string;
 }
 

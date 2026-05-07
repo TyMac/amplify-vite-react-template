@@ -314,6 +314,7 @@ async function analyzeImageWithGeminiFlash(imageBase64: string, prompt: string) 
     analysis: result.candidates?.[0]?.content?.parts?.[0]?.text || 'Could not analyze image',
     tokensUsed: result.usageMetadata?.totalTokenCount || 0,
     modelUsed: 'gemini-2.0-flash-001',
+    providerUsed: 'gemini',
   };
 }
 
@@ -348,6 +349,7 @@ async function analyzeImageWithGemma4(imageBase64: string, prompt: string) {
     analysis: extractOpenAIText(result) || 'Could not analyze image',
     tokensUsed: result.usage?.total_tokens || 0,
     modelUsed: GEMMA4_MAAS_MODEL,
+    providerUsed: 'gemma4',
   };
 }
 
@@ -357,21 +359,124 @@ async function analyzeImageWithGemma4(imageBase64: string, prompt: string) {
  */
 async function geminiVision(args: { imageBase64: string; prompt?: string }) {
   const { imageBase64, prompt = 'What kind of coffee beans or equipment is in this image? Provide details about origin, roast level, grinder type, or any other relevant information.' } = args;
+  const requestedProvider = VISION_MODEL_PROVIDER;
+  const startedAt = Date.now();
 
-  if (VISION_MODEL_PROVIDER === 'gemma4') {
+  console.info('Vision model selection started', {
+    requestedProvider,
+    gemmaModel: GEMMA4_MAAS_MODEL,
+    openAiLocation: VERTEX_OPENAI_LOCATION,
+    promptLength: prompt.length,
+    imageBase64Length: imageBase64.length,
+  });
+
+  if (requestedProvider === 'gemma4') {
     try {
+      const gemmaStart = Date.now();
       const gemmaResult = await analyzeImageWithGemma4(imageBase64, prompt);
+      const gemmaLatencyMs = Date.now() - gemmaStart;
+
       if (gemmaResult.analysis && gemmaResult.analysis !== 'Could not analyze image') {
-        return JSON.stringify(gemmaResult);
+        const response = {
+          ...gemmaResult,
+          requestedProvider,
+          fallbackUsed: false,
+          fallbackReason: null,
+          latencyMs: Date.now() - startedAt,
+          providerLatencyMs: gemmaLatencyMs,
+        };
+        console.info('Vision model selected', {
+          requestedProvider,
+          providerUsed: response.providerUsed,
+          modelUsed: response.modelUsed,
+          fallbackUsed: response.fallbackUsed,
+          tokensUsed: response.tokensUsed,
+          latencyMs: response.latencyMs,
+          providerLatencyMs: response.providerLatencyMs,
+        });
+        return JSON.stringify(response);
       }
-      console.warn('Gemma 4 vision returned empty analysis; falling back to Gemini Flash');
+
+      console.warn('Gemma 4 vision returned empty analysis; falling back to Gemini Flash', {
+        requestedProvider,
+        gemmaModel: GEMMA4_MAAS_MODEL,
+        gemmaLatencyMs,
+      });
+      const geminiStart = Date.now();
+      const geminiResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+      const response = {
+        ...geminiResult,
+        requestedProvider,
+        fallbackUsed: true,
+        fallbackReason: 'gemma_empty_response',
+        latencyMs: Date.now() - startedAt,
+        providerLatencyMs: Date.now() - geminiStart,
+      };
+      console.info('Vision model selected', {
+        requestedProvider,
+        providerUsed: response.providerUsed,
+        modelUsed: response.modelUsed,
+        fallbackUsed: response.fallbackUsed,
+        fallbackReason: response.fallbackReason,
+        tokensUsed: response.tokensUsed,
+        latencyMs: response.latencyMs,
+        providerLatencyMs: response.providerLatencyMs,
+      });
+      return JSON.stringify(response);
     } catch (error: any) {
-      console.error('Gemma 4 vision failed; falling back to Gemini Flash:', error.message);
+      const fallbackReason = `gemma_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
+      console.error('Gemma 4 vision failed; falling back to Gemini Flash', {
+        requestedProvider,
+        gemmaModel: GEMMA4_MAAS_MODEL,
+        fallbackReason,
+        errorMessage: error?.message,
+        errorStatus: error?.response?.status,
+        errorData: error?.response?.data,
+      });
+      const geminiStart = Date.now();
+      const geminiResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+      const response = {
+        ...geminiResult,
+        requestedProvider,
+        fallbackUsed: true,
+        fallbackReason,
+        latencyMs: Date.now() - startedAt,
+        providerLatencyMs: Date.now() - geminiStart,
+      };
+      console.info('Vision model selected', {
+        requestedProvider,
+        providerUsed: response.providerUsed,
+        modelUsed: response.modelUsed,
+        fallbackUsed: response.fallbackUsed,
+        fallbackReason: response.fallbackReason,
+        tokensUsed: response.tokensUsed,
+        latencyMs: response.latencyMs,
+        providerLatencyMs: response.providerLatencyMs,
+      });
+      return JSON.stringify(response);
     }
   }
 
+  const geminiStart = Date.now();
   const geminiResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
-  return JSON.stringify(geminiResult);
+  const response = {
+    ...geminiResult,
+    requestedProvider,
+    fallbackUsed: false,
+    fallbackReason: null,
+    latencyMs: Date.now() - startedAt,
+    providerLatencyMs: Date.now() - geminiStart,
+  };
+  console.info('Vision model selected', {
+    requestedProvider,
+    providerUsed: response.providerUsed,
+    modelUsed: response.modelUsed,
+    fallbackUsed: response.fallbackUsed,
+    tokensUsed: response.tokensUsed,
+    latencyMs: response.latencyMs,
+    providerLatencyMs: response.providerLatencyMs,
+  });
+  return JSON.stringify(response);
 }
 
 /**
