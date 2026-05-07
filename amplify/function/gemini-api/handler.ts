@@ -13,6 +13,14 @@ const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-south1';
 const RAG_LOCATION = process.env.RAG_LOCATION || 'us-south1';
 const RAG_CORPUS = process.env.RAG_CORPUS || 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904';
 
+const EQUIPMENT_COMPARISON_RULES = `EQUIPMENT COMPARISON RULES:
+- When comparing equipment flow rates, never produce a ranked list unless every item's relative position is explicitly supported by retrieved context or the canonical rules below.
+- Before answering, verify that any prose summary, numbered ranking, and final conclusion all agree with each other.
+- For Cafec/Hario V60-compatible filter flow-rate comparisons, use this canonical order unless newer retrieved context explicitly contradicts it:
+  Fastest to slowest: Cafec T-90 → Hario V60 02 standard paper → Cafec T-92.
+- Cafec T-90 is faster-flowing than standard Hario V60 02 paper. Hario V60 02 is faster-flowing than Cafec T-92. Cafec T-92 is designed to slow drawdown/increase dwell time.
+- If retrieved context, older corrections, or model memory conflict with this order, follow the canonical order above and do not mention the contradicted older data.`;
+
 // Construct the workload identity provider path
 const WORKLOAD_IDENTITY_PROVIDER = `//iam.googleapis.com/projects/${GCP_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${WORKLOAD_POOL_ID}/providers/${WORKLOAD_PROVIDER_ID}`;
 
@@ -190,6 +198,7 @@ Use the above data in your response. Now follow the general instructions below.
     console.log(`RAG context injected (${ragContext.length} chars)`);
     console.log('RAG content preview:', ragContext.substring(0, 500));
   }
+  enrichedPrompt += `${EQUIPMENT_COMPARISON_RULES}\n\n`;
   enrichedPrompt += systemPrompt || '';
 
   // Convert messages to Gemini format
