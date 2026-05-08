@@ -15,6 +15,7 @@ const RAG_LOCATION = process.env.RAG_LOCATION || 'us-south1';
 const RAG_CORPUS = process.env.RAG_CORPUS || 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904';
 const VISION_MODEL_PROVIDER = process.env.VISION_MODEL_PROVIDER || 'gemini';
 const GEMMA4_MAAS_MODEL = process.env.GEMMA4_MAAS_MODEL || 'google/gemma-4-26b-a4b-it-maas';
+const GEMMA4_VISION_TIMEOUT_MS = Number(process.env.GEMMA4_VISION_TIMEOUT_MS || 20000);
 
 const EQUIPMENT_COMPARISON_RULES = `EQUIPMENT COMPARISON RULES:
 - When comparing equipment flow rates, never produce a ranked list unless every item's relative position is explicitly supported by retrieved context or the canonical rules below.
@@ -285,6 +286,21 @@ Use the above data in your response. Now follow the general instructions below.
   }
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${label}_timeout_${timeoutMs}ms`)), timeoutMs);
+    promise
+      .then((value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timeout);
+        reject(error);
+      });
+  });
+}
+
 /**
  * Analyze image with Gemini Vision.
  */
@@ -373,7 +389,11 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
   if (requestedProvider === 'gemma4') {
     try {
       const gemmaStart = Date.now();
-      const gemmaResult = await analyzeImageWithGemma4(imageBase64, prompt);
+      const gemmaResult = await withTimeout(
+        analyzeImageWithGemma4(imageBase64, prompt),
+        GEMMA4_VISION_TIMEOUT_MS,
+        'gemma4_vision'
+      );
       const gemmaLatencyMs = Date.now() - gemmaStart;
 
       if (gemmaResult.analysis && gemmaResult.analysis !== 'Could not analyze image') {
