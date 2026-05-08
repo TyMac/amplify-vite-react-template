@@ -145,6 +145,16 @@ export async function chatWithGemini(
   }
 
   const parsed = JSON.parse(result.data);
+  console.info("Chat model debug", {
+    requestedProvider: parsed.requestedProvider,
+    providerUsed: parsed.providerUsed,
+    modelUsed: parsed.modelUsed,
+    fallbackUsed: parsed.fallbackUsed,
+    fallbackReason: parsed.fallbackReason,
+    tokensUsed: parsed.tokensUsed,
+    latencyMs: parsed.latencyMs,
+    providerLatencyMs: parsed.providerLatencyMs,
+  });
   return parsed.response;
 }
 

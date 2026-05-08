@@ -13,8 +13,10 @@ const VERTEX_LOCATION = process.env.VERTEX_LOCATION || 'us-south1';
 const VERTEX_OPENAI_LOCATION = process.env.VERTEX_OPENAI_LOCATION || 'global';
 const RAG_LOCATION = process.env.RAG_LOCATION || 'us-south1';
 const RAG_CORPUS = process.env.RAG_CORPUS || 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904';
+const CHAT_MODEL_PROVIDER = process.env.CHAT_MODEL_PROVIDER || 'gemini';
 const VISION_MODEL_PROVIDER = process.env.VISION_MODEL_PROVIDER || 'gemini';
 const GEMMA4_MAAS_MODEL = process.env.GEMMA4_MAAS_MODEL || 'google/gemma-4-26b-a4b-it-maas';
+const GEMMA4_CHAT_TIMEOUT_MS = Number(process.env.GEMMA4_CHAT_TIMEOUT_MS || 20000);
 const GEMMA4_VISION_TIMEOUT_MS = Number(process.env.GEMMA4_VISION_TIMEOUT_MS || 20000);
 
 const EQUIPMENT_COMPARISON_RULES = `EQUIPMENT COMPARISON RULES:
@@ -210,6 +212,8 @@ export async function handler(event: any) {
  */
 async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
   const { messages: messagesJson, systemPrompt } = args;
+  const requestedProvider = CHAT_MODEL_PROVIDER;
+  const startedAt = Date.now();
 
   // Parse messages from JSON strings
   const messages: Array<{ role: string; content: string }> = messagesJson.map(m => JSON.parse(m));
@@ -243,47 +247,186 @@ Use the above data in your response. Now follow the general instructions below.
   enrichedPrompt += `${EQUIPMENT_COMPARISON_RULES}\n\n`;
   enrichedPrompt += systemPrompt || '';
 
-  // Convert messages to Gemini format
-  const contents = messages.map((msg) => ({
-    role: msg.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: msg.content }],
-  }));
+  const geminiModel = 'gemini-2.0-flash-lite-001';
 
-  // Use only the requested model
-  const model = 'gemini-2.0-flash-lite-001';
+  const callGeminiChat = async () => {
+    const contents = messages.map((msg) => ({
+      role: msg.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: msg.content }],
+    }));
 
-  // Prepare request payload
-  const payload: any = {
-    contents,
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 4096,
-      topP: 0.95,
-    },
+    const payload: any = {
+      contents,
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 4096,
+        topP: 0.95,
+      },
+    };
+
+    if (enrichedPrompt) {
+      payload.systemInstruction = {
+        parts: [{ text: enrichedPrompt }]
+      };
+    }
+
+    console.log(`Using chat model: ${geminiModel}`);
+    const result = await callVertexAI(`publishers/google/models/${geminiModel}:generateContent`, payload);
+    return {
+      response: result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated',
+      tokensUsed: result.usageMetadata?.totalTokenCount || 0,
+      modelUsed: geminiModel,
+      providerUsed: 'gemini',
+    };
   };
 
-  // Add system instruction if provided (now enriched with RAG context)
-  if (enrichedPrompt) {
-    payload.systemInstruction = {
-      parts: [{ text: enrichedPrompt }]
-    };
-  }
-
-  try {
-    console.log(`Using model: ${model}`);
-    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
-
-    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated';
-    
-    return JSON.stringify({
-      response: responseText,
-      tokensUsed: result.usageMetadata?.totalTokenCount || 0,
-      modelUsed: model
+  const callGemma4Chat = async () => {
+    console.log(`Using chat model: ${GEMMA4_MAAS_MODEL}`);
+    const result = await callVertexOpenAI({
+      model: GEMMA4_MAAS_MODEL,
+      stream: false,
+      max_tokens: 4096,
+      messages: [
+        ...(enrichedPrompt ? [{ role: 'system', content: enrichedPrompt }] : []),
+        ...messages.map((msg) => ({
+          role: msg.role === 'assistant' ? 'assistant' : 'user',
+          content: msg.content,
+        })),
+      ],
+      temperature: 0.7,
+      top_p: 0.95,
+      chat_template_kwargs: {
+        enable_thinking: false,
+      },
     });
-  } catch (error: any) {
-    console.error(`Model ${model} failed:`, error.message);
-    throw error;
+    return {
+      response: extractOpenAIText(result) || 'No response generated',
+      tokensUsed: result.usage?.total_tokens || 0,
+      modelUsed: GEMMA4_MAAS_MODEL,
+      providerUsed: 'gemma4',
+    };
+  };
+
+  console.info('Chat model selection started', {
+    requestedProvider,
+    gemmaModel: GEMMA4_MAAS_MODEL,
+    openAiLocation: VERTEX_OPENAI_LOCATION,
+    messageCount: messages.length,
+    latestUserMessageLength: latestUserMessage.length,
+    ragContextLength: ragContext.length,
+  });
+
+  if (requestedProvider === 'gemma4') {
+    try {
+      const gemmaStart = Date.now();
+      const gemmaResult = await withTimeout(
+        callGemma4Chat(),
+        GEMMA4_CHAT_TIMEOUT_MS,
+        'gemma4_chat'
+      );
+      const gemmaLatencyMs = Date.now() - gemmaStart;
+
+      if (gemmaResult.response && gemmaResult.response !== 'No response generated') {
+        const response = {
+          ...gemmaResult,
+          requestedProvider,
+          fallbackUsed: false,
+          fallbackReason: null,
+          latencyMs: Date.now() - startedAt,
+          providerLatencyMs: gemmaLatencyMs,
+        };
+        console.info('Chat model selected', {
+          requestedProvider,
+          providerUsed: response.providerUsed,
+          modelUsed: response.modelUsed,
+          fallbackUsed: response.fallbackUsed,
+          tokensUsed: response.tokensUsed,
+          latencyMs: response.latencyMs,
+          providerLatencyMs: response.providerLatencyMs,
+        });
+        return JSON.stringify(response);
+      }
+
+      console.warn('Gemma 4 chat returned empty response; falling back to Gemini Flash Lite', {
+        requestedProvider,
+        gemmaModel: GEMMA4_MAAS_MODEL,
+        gemmaLatencyMs,
+      });
+      const geminiStart = Date.now();
+      const geminiResult = await callGeminiChat();
+      const response = {
+        ...geminiResult,
+        requestedProvider,
+        fallbackUsed: true,
+        fallbackReason: 'gemma_empty_response',
+        latencyMs: Date.now() - startedAt,
+        providerLatencyMs: Date.now() - geminiStart,
+      };
+      console.info('Chat model selected', {
+        requestedProvider,
+        providerUsed: response.providerUsed,
+        modelUsed: response.modelUsed,
+        fallbackUsed: response.fallbackUsed,
+        fallbackReason: response.fallbackReason,
+        tokensUsed: response.tokensUsed,
+        latencyMs: response.latencyMs,
+        providerLatencyMs: response.providerLatencyMs,
+      });
+      return JSON.stringify(response);
+    } catch (error: any) {
+      const fallbackReason = `gemma_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
+      console.error('Gemma 4 chat failed; falling back to Gemini Flash Lite', {
+        requestedProvider,
+        gemmaModel: GEMMA4_MAAS_MODEL,
+        fallbackReason,
+        errorMessage: error?.message,
+        errorStatus: error?.response?.status,
+        errorData: error?.response?.data,
+      });
+      const geminiStart = Date.now();
+      const geminiResult = await callGeminiChat();
+      const response = {
+        ...geminiResult,
+        requestedProvider,
+        fallbackUsed: true,
+        fallbackReason,
+        latencyMs: Date.now() - startedAt,
+        providerLatencyMs: Date.now() - geminiStart,
+      };
+      console.info('Chat model selected', {
+        requestedProvider,
+        providerUsed: response.providerUsed,
+        modelUsed: response.modelUsed,
+        fallbackUsed: response.fallbackUsed,
+        fallbackReason: response.fallbackReason,
+        tokensUsed: response.tokensUsed,
+        latencyMs: response.latencyMs,
+        providerLatencyMs: response.providerLatencyMs,
+      });
+      return JSON.stringify(response);
+    }
   }
+
+  const geminiStart = Date.now();
+  const geminiResult = await callGeminiChat();
+  const response = {
+    ...geminiResult,
+    requestedProvider,
+    fallbackUsed: false,
+    fallbackReason: null,
+    latencyMs: Date.now() - startedAt,
+    providerLatencyMs: Date.now() - geminiStart,
+  };
+  console.info('Chat model selected', {
+    requestedProvider,
+    providerUsed: response.providerUsed,
+    modelUsed: response.modelUsed,
+    fallbackUsed: response.fallbackUsed,
+    tokensUsed: response.tokensUsed,
+    latencyMs: response.latencyMs,
+    providerLatencyMs: response.providerLatencyMs,
+  });
+  return JSON.stringify(response);
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
