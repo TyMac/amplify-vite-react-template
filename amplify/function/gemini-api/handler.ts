@@ -16,7 +16,7 @@ const RAG_CORPUS = process.env.RAG_CORPUS || 'projects/deductive-jet-464913-p8/l
 const CHAT_MODEL_PROVIDER = process.env.CHAT_MODEL_PROVIDER || 'gemini';
 const VISION_MODEL_PROVIDER = process.env.VISION_MODEL_PROVIDER || 'gemini';
 const GEMMA4_MAAS_MODEL = process.env.GEMMA4_MAAS_MODEL || 'google/gemma-4-26b-a4b-it-maas';
-const GEMMA4_CHAT_TIMEOUT_MS = Number(process.env.GEMMA4_CHAT_TIMEOUT_MS || 20000);
+const GEMMA4_CHAT_TIMEOUT_MS = Number(process.env.GEMMA4_CHAT_TIMEOUT_MS || 8000);
 const GEMMA4_VISION_TIMEOUT_MS = Number(process.env.GEMMA4_VISION_TIMEOUT_MS || 20000);
 
 const EQUIPMENT_COMPARISON_RULES = `EQUIPMENT COMPARISON RULES:

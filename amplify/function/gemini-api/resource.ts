@@ -18,7 +18,7 @@ export const geminiApi = defineFunction({
     CHAT_MODEL_PROVIDER: "gemma4",
     VISION_MODEL_PROVIDER: "gemma4",
     GEMMA4_MAAS_MODEL: "google/gemma-4-26b-a4b-it-maas",
-    GEMMA4_CHAT_TIMEOUT_MS: "20000",
+    GEMMA4_CHAT_TIMEOUT_MS: "8000",
     GEMMA4_VISION_TIMEOUT_MS: "20000",
     // RAG_CORPUS_ID: 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904',
   },
