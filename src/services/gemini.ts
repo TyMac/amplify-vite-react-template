@@ -4,9 +4,39 @@
  */
 
 import { generateClient } from "aws-amplify/data";
+import { getCurrentUser } from "aws-amplify/auth";
 import type { Schema } from "../../amplify/data/resource";
 
-const client = generateClient<Schema>({ authMode: "apiKey" });
+type AuthMode = "apiKey" | "userPool";
+const clients: Partial<Record<AuthMode, ReturnType<typeof generateClient<Schema>>>> = {};
+
+function getClient(authMode: AuthMode = "apiKey") {
+  if (!clients[authMode]) clients[authMode] = generateClient<Schema>({ authMode });
+  return clients[authMode]!;
+}
+
+function getAnonymousDeviceId(): string {
+  const key = "barista_anonymous_device_id";
+  let deviceId = window.localStorage.getItem(key);
+  if (!deviceId) {
+    const randomId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    deviceId = `web-${randomId}`;
+    window.localStorage.setItem(key, deviceId);
+  }
+  return deviceId;
+}
+
+async function getAiRequestAuth(): Promise<{ authMode: AuthMode; deviceId?: string }> {
+  try {
+    await getCurrentUser();
+    return { authMode: "userPool" };
+  } catch {
+    return { authMode: "apiKey", deviceId: getAnonymousDeviceId() };
+  }
+}
 
 export const BARISTA_SYSTEM_PROMPT = `You are Barista, a specialty coffee assistant focused exclusively on pour-over coffee.
 
@@ -106,7 +136,7 @@ export async function analyzeImageWithGemini(
   imageBase64: string,
   prompt?: string
 ): Promise<string> {
-  const result = await client.queries.geminiVision({
+  const result = await getClient("apiKey").queries.geminiVision({
     imageBase64,
     prompt: prompt || "Analyze this coffee setup and provide the most useful next brewing guidance.",
   });
@@ -133,29 +163,43 @@ export async function chatWithGemini(
   messages: { role: "user" | "assistant"; content: string }[],
   systemPrompt?: string
 ): Promise<string> {
-  const messagesJson = messages.map((msg) => JSON.stringify(msg));
+  try {
+    const messagesJson = messages.map((msg) => JSON.stringify(msg));
+    const { authMode, deviceId } = await getAiRequestAuth();
 
-  const result = await client.queries.geminiChat({
-    messages: messagesJson,
-    systemPrompt: systemPrompt || BARISTA_SYSTEM_PROMPT,
-  });
+    const result = await getClient(authMode).queries.geminiChat({
+      messages: messagesJson,
+      systemPrompt: systemPrompt || BARISTA_SYSTEM_PROMPT,
+      deviceId,
+    });
 
-  if (!result.data) {
-    throw new Error("No response from Gemini API");
+    if (result.errors?.length) {
+      throw new Error(result.errors.map((err: { message?: string }) => err.message).join("; "));
+    }
+
+    if (!result.data) {
+      throw new Error("No response from Gemini API");
+    }
+
+    const parsed = JSON.parse(result.data);
+    console.info("Chat model debug", {
+      requestedProvider: parsed.requestedProvider,
+      providerUsed: parsed.providerUsed,
+      modelUsed: parsed.modelUsed,
+      fallbackUsed: parsed.fallbackUsed,
+      fallbackReason: parsed.fallbackReason,
+      tokensUsed: parsed.tokensUsed,
+      latencyMs: parsed.latencyMs,
+      providerLatencyMs: parsed.providerLatencyMs,
+    });
+    return parsed.response;
+  } catch (error: any) {
+    const errorMessage = error?.message || error?.errors?.[0]?.message || "";
+    if (errorMessage.includes("Anonymous daily AI chat limit reached")) {
+      throw new Error("You’ve used today’s 3 free AI chats. Create a free account to keep chatting.");
+    }
+    throw error;
   }
-
-  const parsed = JSON.parse(result.data);
-  console.info("Chat model debug", {
-    requestedProvider: parsed.requestedProvider,
-    providerUsed: parsed.providerUsed,
-    modelUsed: parsed.modelUsed,
-    fallbackUsed: parsed.fallbackUsed,
-    fallbackReason: parsed.fallbackReason,
-    tokensUsed: parsed.tokensUsed,
-    latencyMs: parsed.latencyMs,
-    providerLatencyMs: parsed.providerLatencyMs,
-  });
-  return parsed.response;
 }
 
 export interface ExtractedJournalFields {
@@ -231,7 +275,7 @@ export async function extractJournalFieldsFromChat(
     }));
   }
 
-  const result = await client.queries.extractJournalFields({
+  const result = await getClient("apiKey").queries.extractJournalFields({
     messages: messagesJson,
   });
 

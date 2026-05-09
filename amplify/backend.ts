@@ -14,10 +14,18 @@ const backend = defineBackend({
   storage,
 });
 
-// Configure DynamoDB Table for point-in-time recovery
+// Configure DynamoDB Tables
 const chatSessionTable =
   backend.data.resources.cfnResources.amplifyDynamoDbTables["ChatSession"];
 chatSessionTable.pointInTimeRecoveryEnabled = true;
+
+const aiUsageLimitTable =
+  backend.data.resources.cfnResources.amplifyDynamoDbTables["AiUsageLimit"];
+aiUsageLimitTable.pointInTimeRecoveryEnabled = true;
+aiUsageLimitTable.timeToLiveSpecification = {
+  attributeName: "expiresAt",
+  enabled: true,
+};
 
 // Grant Lambda permission to call STS (needed for Workload Identity Federation)
 // The Lambda will use its execution role credentials to authenticate to GCP
@@ -55,4 +63,20 @@ backend.storage.resources.bucket.grantReadWrite(
 backend.geminiApi.resources.lambda.addEnvironment(
   "STORAGE_BUCKET_NAME",
   backend.storage.resources.bucket.bucketName,
+);
+
+// Add anonymous AI usage limit table name to Lambda environment variables
+// @ts-ignore
+backend.geminiApi.resources.lambda.addEnvironment(
+  "AI_USAGE_LIMIT_TABLE_NAME",
+  aiUsageLimitTable.ref,
+);
+
+// Grant Gemini Lambda access to update anonymous AI usage counters
+backend.geminiApi.resources.lambda.addToRolePolicy(
+  new PolicyStatement({
+    effect: Effect.ALLOW,
+    actions: ["dynamodb:GetItem", "dynamodb:UpdateItem"],
+    resources: [aiUsageLimitTable.attrArn],
+  }),
 );

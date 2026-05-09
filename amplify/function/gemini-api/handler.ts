@@ -1,4 +1,5 @@
 import { GoogleAuth } from 'google-auth-library';
+import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 
 // Declare process global for TypeScript
 declare const process: { env: Record<string, string | undefined> };
@@ -18,6 +19,10 @@ const VISION_MODEL_PROVIDER = process.env.VISION_MODEL_PROVIDER || 'gemini';
 const GEMMA4_MAAS_MODEL = process.env.GEMMA4_MAAS_MODEL || 'google/gemma-4-26b-a4b-it-maas';
 const GEMMA4_CHAT_TIMEOUT_MS = Number(process.env.GEMMA4_CHAT_TIMEOUT_MS || 8000);
 const GEMMA4_VISION_TIMEOUT_MS = Number(process.env.GEMMA4_VISION_TIMEOUT_MS || 20000);
+const AI_USAGE_LIMIT_TABLE_NAME = process.env.AI_USAGE_LIMIT_TABLE_NAME;
+const ANONYMOUS_DAILY_CHAT_LIMIT = Number(process.env.ANONYMOUS_DAILY_CHAT_LIMIT || 3);
+
+const dynamoDb = new DynamoDBClient({});
 
 const EQUIPMENT_COMPARISON_RULES = `EQUIPMENT COMPARISON RULES:
 - When comparing equipment flow rates, never produce a ranked list unless every item's relative position is explicitly supported by retrieved context or the canonical rules below.
@@ -33,6 +38,7 @@ const WORKLOAD_IDENTITY_PROVIDER = `//iam.googleapis.com/projects/${GCP_PROJECT_
 interface ChatInput {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   systemPrompt?: string;
+  deviceId?: string;
 }
 
 interface VisionInput {
@@ -98,6 +104,94 @@ async function callVertexOpenAI(payload: any): Promise<any> {
   } as any);
 
   return response.data;
+}
+
+class AnonymousDailyLimitError extends Error {
+  constructor(public readonly limit: number) {
+    super(`Anonymous daily AI chat limit reached (${limit}/day)`);
+    this.name = 'AnonymousDailyLimitError';
+  }
+}
+
+function isAuthenticatedAppSyncRequest(event: any): boolean {
+  const identity = event?.identity;
+  return Boolean(
+    identity?.sub ||
+    identity?.username ||
+    identity?.claims?.sub ||
+    identity?.resolverContext?.sub
+  );
+}
+
+function getUtcDateKey(now = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+function getTtlEpochSeconds(now = new Date()): number {
+  // Keep daily counter rows for a few days so DynamoDB TTL can clean them up asynchronously.
+  return Math.floor(now.getTime() / 1000) + 7 * 24 * 60 * 60;
+}
+
+function sanitizeDeviceId(deviceId: string): string {
+  return deviceId.trim().slice(0, 160);
+}
+
+async function enforceAnonymousDailyChatLimit(args: { deviceId?: string }, event: any) {
+  if (isAuthenticatedAppSyncRequest(event)) {
+    return;
+  }
+
+  if (!AI_USAGE_LIMIT_TABLE_NAME) {
+    console.warn('AI usage limit table not configured; allowing anonymous chat request');
+    return;
+  }
+
+  const sanitizedDeviceId = sanitizeDeviceId(args.deviceId || '');
+  const deviceId = sanitizedDeviceId || 'unknown-device';
+  const today = getUtcDateKey();
+  const identityKey = `anon:${deviceId}`;
+  const identityDate = `${identityKey}#${today}`;
+  const nowIso = new Date().toISOString();
+  const expiresAt = getTtlEpochSeconds();
+
+  try {
+    const result = await dynamoDb.send(new UpdateItemCommand({
+      TableName: AI_USAGE_LIMIT_TABLE_NAME,
+      Key: {
+        identityDate: { S: identityDate },
+      },
+      UpdateExpression: 'SET identityKey = :identityKey, #date = :date, lastRequestAt = :now, expiresAt = :expiresAt ADD #count :inc',
+      ConditionExpression: 'attribute_not_exists(#count) OR #count < :limit',
+      ExpressionAttributeNames: {
+        '#count': 'count',
+        '#date': 'date',
+      },
+      ExpressionAttributeValues: {
+        ':identityKey': { S: identityKey },
+        ':date': { S: today },
+        ':now': { S: nowIso },
+        ':expiresAt': { N: String(expiresAt) },
+        ':inc': { N: '1' },
+        ':limit': { N: String(ANONYMOUS_DAILY_CHAT_LIMIT) },
+      },
+      ReturnValues: 'UPDATED_NEW',
+    }));
+
+    console.info('Anonymous AI chat usage counted', {
+      identityDate,
+      count: result.Attributes?.count?.N,
+      limit: ANONYMOUS_DAILY_CHAT_LIMIT,
+    });
+  } catch (error: any) {
+    if (error?.name === 'ConditionalCheckFailedException') {
+      console.warn('Anonymous AI chat daily limit reached', {
+        identityDate,
+        limit: ANONYMOUS_DAILY_CHAT_LIMIT,
+      });
+      throw new AnonymousDailyLimitError(ANONYMOUS_DAILY_CHAT_LIMIT);
+    }
+    throw error;
+  }
 }
 
 function extractOpenAIText(result: any): string {
@@ -190,7 +284,7 @@ export async function handler(event: any) {
   try {
     switch (fieldName) {
       case 'geminiChat':
-        return await geminiChat(args);
+        return await geminiChat(args, event);
       case 'geminiVision':
         return await geminiVision(args);
       case 'extractJournalFields':
@@ -210,7 +304,9 @@ export async function handler(event: any) {
 /**
  * Chat with Gemini Flash
  */
-async function geminiChat(args: { messages: string[]; systemPrompt?: string }) {
+async function geminiChat(args: { messages: string[]; systemPrompt?: string; deviceId?: string }, event: any) {
+  await enforceAnonymousDailyChatLimit(args, event);
+
   const { messages: messagesJson, systemPrompt } = args;
   const requestedProvider = CHAT_MODEL_PROVIDER;
   const startedAt = Date.now();

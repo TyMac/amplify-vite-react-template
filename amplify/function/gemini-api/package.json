@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.953.0",
     "@types/node": "^25.0.10",
     "google-auth-library": "^9.15.1"
   }

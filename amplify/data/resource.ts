@@ -208,6 +208,22 @@ const schema = a.schema({
     .authorization((allow) => [allow.publicApiKey()]),
 
   // ============================================
+  // AI USAGE LIMITS - Anonymous daily quota tracking
+  // ============================================
+  AiUsageLimit: a
+    .model({
+      identityDate: a.string().required(), // e.g. anon:<deviceId>#2026-05-08
+      identityKey: a.string().required(), // e.g. anon:<deviceId>
+      date: a.string().required(), // YYYY-MM-DD UTC
+      count: a.integer().required(),
+      lastRequestAt: a.datetime(),
+      expiresAt: a.integer(), // DynamoDB TTL epoch seconds
+    })
+    .identifier(["identityDate"])
+    .secondaryIndexes((index) => [index("identityKey"), index("date")])
+    .authorization((allow) => [allow.owner()]),
+
+  // ============================================
   // CHAT SESSIONS - User chat history
   // ============================================
   ChatSession: a
@@ -371,9 +387,10 @@ const schema = a.schema({
     .arguments({
       messages: a.string().array().required(), // JSON stringified messages
       systemPrompt: a.string(),
+      deviceId: a.string(), // anonymous daily quota key from mobile/web clients
     })
     .returns(a.string()) // JSON response
-    .authorization((allow) => [allow.publicApiKey()])
+    .authorization((allow) => [allow.publicApiKey(), allow.authenticated()])
     .handler(a.handler.function(geminiApi)),
 
   geminiVision: a

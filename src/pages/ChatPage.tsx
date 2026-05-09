@@ -427,12 +427,15 @@ export default function ChatPage() {
       setMessages((prev) => [...prev, assistantMsg]);
       await chatStorage.addMessage(session.id, assistantMsg);
       return response;
-    } catch (err) {
+    } catch (err: any) {
       console.error("Gemini error:", err);
+      const message = err?.message?.includes("3 free AI chats")
+        ? err.message
+        : "Sorry, I'm having trouble connecting right now. Please try again.";
       const errorMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: "Sorry, I'm having trouble connecting right now. Please try again.",
+        content: message,
         timestamp: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, errorMsg]);
@@ -772,7 +775,7 @@ export default function ChatPage() {
             </button>
           </div>
           <p className="text-center text-xs text-base-content/30 mt-2">
-            Shift+Enter for new line · Powered by Gemini
+            Shift+Enter for new line · Powered by Gemma 4
           </p>
         </div>
       </div>
