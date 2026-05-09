@@ -603,7 +603,7 @@ export default function JournalPage() {
       </div>
 
       {/* ── Right Pane: Timeline ── */}
-      <div className={`hidden lg:flex flex-col border-l border-base-200 bg-base-100 transition-all duration-200 ${timelineOpen ? "w-96" : "w-10"}`}>
+      <div className={`hidden lg:flex flex-col border-l border-base-200 bg-base-100 transition-all duration-200 ${timelineOpen ? "w-96" : "w-12"}`}>
 
         {/* Collapsed rail — just toggle button */}
         {!timelineOpen && (
@@ -617,7 +617,7 @@ export default function JournalPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
               </svg>
             </button>
-            <span className="text-xs text-base-content/30 [writing-mode:vertical-lr] rotate-180 tracking-wider uppercase mt-2">Timeline</span>
+            <span className="text-[11px] text-base-content/35 [writing-mode:vertical-lr] rotate-180 tracking-wider uppercase mt-2 text-center">Timeline</span>
           </div>
         )}
 
@@ -634,12 +634,10 @@ export default function JournalPage() {
                 </button>
                 <button
                   onClick={() => setTimelineOpen(false)}
-                  className="btn btn-ghost btn-xs btn-square"
-                  title="Collapse timeline"
+                  className="btn btn-ghost btn-xs"
+                  title="Collapse timeline column"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  Collapse
                 </button>
               </div>
             </div>
@@ -652,17 +650,17 @@ export default function JournalPage() {
 
                 if (!hasContent) {
                   return (
-                    <div
+                    <button
                       key={dateKey}
                       onClick={() => handleDateClick(dateKey)}
-                      className={`px-3 py-1.5 border-b border-base-100 cursor-pointer hover:bg-base-200/50 transition-colors ${
+                      className={`w-full px-3 py-1.5 border-b border-base-100 cursor-pointer hover:bg-base-200/50 transition-colors text-center ${
                         isActiveDate ? "bg-primary/5" : ""
                       }`}
                     >
-                      <p className={`text-xs ${isActiveDate ? "text-primary font-medium" : "text-base-content/30"}`}>
+                      <span className={`block text-xs ${isActiveDate ? "text-primary font-medium" : "text-base-content/30"}`}>
                         {formatShortDate(dateKey, timezone)}
-                      </p>
-                    </div>
+                      </span>
+                    </button>
                   );
                 }
 
@@ -674,15 +672,16 @@ export default function JournalPage() {
                     }`}
                     style={isActiveDate ? { backgroundColor: "oklch(var(--p)/0.06)" } : {}}
                   >
-                    <p
-                      className={`text-xs font-medium mb-1.5 cursor-pointer hover:text-primary ${
+                    <button
+                      type="button"
+                      className={`block w-full text-center text-xs font-medium mb-1.5 cursor-pointer hover:text-primary ${
                         isActiveDate ? "text-primary" : "text-base-content/60"
                       }`}
                       onClick={() => handleDateClick(dateKey)}
                     >
                       {isActiveDate && <span className="mr-1">▸</span>}
                       {formatShortDate(dateKey, timezone)}
-                    </p>
+                    </button>
                     <div className="flex flex-col gap-1">
                       {dayEntries.map((entry) => {
                         const color = entry.coffeeBatchId
