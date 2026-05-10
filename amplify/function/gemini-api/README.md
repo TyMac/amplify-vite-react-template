@@ -190,6 +190,7 @@ aws lambda update-function-code \
 
 ## References
 
+- Barista AI model routing, fallback, and attribution: `../../../docs/ai-model-routing.md`
 - [Workload Identity Federation](https://cloud.google.com/iam/docs/workload-identity-federation)
 - [Vertex AI Gemini API](https://cloud.google.com/vertex-ai/docs/generative-ai/model-reference/gemini)
 - [Amplify Functions](https://docs.amplify.aws/react/build-a-backend/functions/)
