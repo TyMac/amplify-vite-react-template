@@ -184,7 +184,7 @@ export async function generateRecipeDraft(context: RecipeGenerationContext): Pro
       role: "user",
       content: buildRecipeContextMessage(context),
     },
-  ], RECIPE_SYSTEM_PROMPT);
+  ], RECIPE_SYSTEM_PROMPT, { maxOutputTokens: 4096 });
 
   return parseRecipeDraft(result);
 }

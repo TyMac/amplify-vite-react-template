@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChatMessage } from "../services/chatStorage";
 import {
-  analyzeImageWithGemini,
+  analyzeImageWithGeminiResult,
   buildLiveBrewCoachSystemPrompt,
   buildLiveBrewVisionPrompt,
 } from "../services/gemini";
@@ -241,16 +241,19 @@ export default function LiveBrewCoachDock({
         recentMessages: recentContext,
         equipmentPrompt,
       });
-      const analysis = await analyzeImageWithGemini(base64, prompt);
+      const analysis = await analyzeImageWithGeminiResult(base64, prompt);
 
       const userNote = makeMessage("user", "Shared a brew setup photo for live coaching.");
-      const assistantNote = makeMessage("assistant", analysis);
+      const assistantNote = {
+        ...makeMessage("assistant", analysis.text),
+        modelLabel: analysis.modelLabel,
+      };
 
       await onAppendMessage(userNote);
       await onAppendMessage(assistantNote);
       setStatus("Image guidance added to the chat.");
-      if (speaking && analysis.trim()) {
-        speakText(analysis);
+      if (speaking && analysis.text.trim()) {
+        speakText(analysis.text);
       }
     } catch (error) {
       console.error("Live coach vision failed:", error);

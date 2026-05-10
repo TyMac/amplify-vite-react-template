@@ -388,6 +388,7 @@ const schema = a.schema({
       messages: a.string().array().required(), // JSON stringified messages
       systemPrompt: a.string(),
       deviceId: a.string(), // anonymous daily quota key from mobile/web clients
+      maxOutputTokens: a.integer(), // optional override; normal chat defaults lower, recipe generation asks for more
     })
     .returns(a.string()) // JSON response
     .authorization((allow) => [allow.publicApiKey(), allow.authenticated()])

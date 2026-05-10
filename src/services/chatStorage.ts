@@ -15,6 +15,7 @@ export interface ChatMessage {
   content: string;
   timestamp: string;
   imageKey?: string; // S3 key for attached image (private/{identityId}/chat-images/...)
+  modelLabel?: string; // Short display label for the model that generated assistant responses
 }
 
 export interface ChatSession {

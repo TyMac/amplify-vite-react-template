@@ -8,7 +8,7 @@ import {
   type ChatMessage,
   type ChatSession,
 } from "../services/chatStorage";
-import { chatWithGemini, BARISTA_SYSTEM_PROMPT } from "../services/gemini";
+import { chatWithGeminiResult, BARISTA_SYSTEM_PROMPT } from "../services/gemini";
 import { TagChip, TagEditor } from "../components/tags";
 import LiveBrewCoachDock from "../components/LiveBrewCoachDock";
 import { getCurrentUser } from "aws-amplify/auth";
@@ -412,7 +412,7 @@ export default function ChatPage() {
         content: m.content,
       }));
 
-      const response = await chatWithGemini(
+      const response = await chatWithGeminiResult(
         allMessages,
         systemPromptOverride ?? equipmentPrompt ?? undefined
       );
@@ -420,13 +420,14 @@ export default function ChatPage() {
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: response,
+        content: response.text,
         timestamp: new Date().toISOString(),
+        modelLabel: response.modelLabel,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
       await chatStorage.addMessage(session.id, assistantMsg);
-      return response;
+      return response.text;
     } catch (err: any) {
       console.error("Gemini error:", err);
       const message = err?.message?.includes("3 free AI chats")
@@ -660,6 +661,7 @@ export default function ChatPage() {
             {messages.map((msg) => {
               const timeLabel = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
               const isUser = msg.role === "user";
+              const modelLabel = !isUser ? msg.modelLabel : undefined;
               return (
               <div
                 key={msg.id}
@@ -710,6 +712,11 @@ export default function ChatPage() {
                       !msg.imageKey || msg.content !== "📷 Image"
                         ? <p className="whitespace-pre-wrap">{msg.content}</p>
                         : null
+                    )}
+                    {modelLabel && (
+                      <div className="mt-2 text-[10px] leading-none text-base-content/35 text-left">
+                        {modelLabel}
+                      </div>
                     )}
                   </div>
                   <button

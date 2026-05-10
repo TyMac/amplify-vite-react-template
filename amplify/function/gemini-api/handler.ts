@@ -304,12 +304,13 @@ export async function handler(event: any) {
 /**
  * Chat with Gemini Flash
  */
-async function geminiChat(args: { messages: string[]; systemPrompt?: string; deviceId?: string }, event: any) {
+async function geminiChat(args: { messages: string[]; systemPrompt?: string; deviceId?: string; maxOutputTokens?: number }, event: any) {
   await enforceAnonymousDailyChatLimit(args, event);
 
   const { messages: messagesJson, systemPrompt } = args;
   const requestedProvider = CHAT_MODEL_PROVIDER;
   const startedAt = Date.now();
+  const maxOutputTokens = Math.min(Math.max(Number(args.maxOutputTokens || 1536), 256), 4096);
 
   // Parse messages from JSON strings
   const messages: Array<{ role: string; content: string }> = messagesJson.map(m => JSON.parse(m));
@@ -355,7 +356,7 @@ Use the above data in your response. Now follow the general instructions below.
       contents,
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 4096,
+        maxOutputTokens,
         topP: 0.95,
       },
     };
@@ -381,7 +382,7 @@ Use the above data in your response. Now follow the general instructions below.
     const result = await callVertexOpenAI({
       model: GEMMA4_MAAS_MODEL,
       stream: false,
-      max_tokens: 4096,
+      max_tokens: maxOutputTokens,
       messages: [
         ...(enrichedPrompt ? [{ role: 'system', content: enrichedPrompt }] : []),
         ...messages.map((msg) => ({
@@ -410,6 +411,7 @@ Use the above data in your response. Now follow the general instructions below.
     messageCount: messages.length,
     latestUserMessageLength: latestUserMessage.length,
     ragContextLength: ragContext.length,
+    maxOutputTokens,
   });
 
   if (requestedProvider === 'gemma4') {

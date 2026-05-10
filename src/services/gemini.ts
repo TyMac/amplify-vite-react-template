@@ -8,6 +8,26 @@ import { getCurrentUser } from "aws-amplify/auth";
 import type { Schema } from "../../amplify/data/resource";
 
 type AuthMode = "apiKey" | "userPool";
+
+export interface AiTextResult {
+  text: string;
+  modelLabel?: string;
+  modelUsed?: string;
+  providerUsed?: string;
+}
+
+export function getModelDisplayLabel(metadata: { modelUsed?: unknown; providerUsed?: unknown }): string | undefined {
+  const model = String(metadata.modelUsed ?? "").toLowerCase();
+  const provider = String(metadata.providerUsed ?? "").toLowerCase();
+  const combined = `${provider} ${model}`.trim();
+
+  if (!combined) return undefined;
+  if (combined.includes("gemma")) return "Gemma";
+  if (combined.includes("gemini")) return "Gemini";
+
+  return String(metadata.providerUsed || metadata.modelUsed || "AI");
+}
+
 const clients: Partial<Record<AuthMode, ReturnType<typeof generateClient<Schema>>>> = {};
 
 function getClient(authMode: AuthMode = "apiKey") {
@@ -132,10 +152,10 @@ Tell the user the most important observation first, then the next physical actio
 Keep the answer brief enough to read aloud.`;
 }
 
-export async function analyzeImageWithGemini(
+export async function analyzeImageWithGeminiResult(
   imageBase64: string,
   prompt?: string
-): Promise<string> {
+): Promise<AiTextResult> {
   const result = await getClient("apiKey").queries.geminiVision({
     imageBase64,
     prompt: prompt || "Analyze this coffee setup and provide the most useful next brewing guidance.",
@@ -156,13 +176,27 @@ export async function analyzeImageWithGemini(
     latencyMs: parsed.latencyMs,
     providerLatencyMs: parsed.providerLatencyMs,
   });
-  return parsed.analysis as string;
+  return {
+    text: parsed.analysis as string,
+    modelLabel: getModelDisplayLabel(parsed),
+    modelUsed: parsed.modelUsed,
+    providerUsed: parsed.providerUsed,
+  };
 }
 
-export async function chatWithGemini(
-  messages: { role: "user" | "assistant"; content: string }[],
-  systemPrompt?: string
+export async function analyzeImageWithGemini(
+  imageBase64: string,
+  prompt?: string
 ): Promise<string> {
+  const result = await analyzeImageWithGeminiResult(imageBase64, prompt);
+  return result.text;
+}
+
+export async function chatWithGeminiResult(
+  messages: { role: "user" | "assistant"; content: string }[],
+  systemPrompt?: string,
+  options?: { maxOutputTokens?: number }
+): Promise<AiTextResult> {
   try {
     const messagesJson = messages.map((msg) => JSON.stringify(msg));
     const { authMode, deviceId } = await getAiRequestAuth();
@@ -171,6 +205,7 @@ export async function chatWithGemini(
       messages: messagesJson,
       systemPrompt: systemPrompt || BARISTA_SYSTEM_PROMPT,
       deviceId,
+      maxOutputTokens: options?.maxOutputTokens,
     });
 
     if (result.errors?.length) {
@@ -192,7 +227,12 @@ export async function chatWithGemini(
       latencyMs: parsed.latencyMs,
       providerLatencyMs: parsed.providerLatencyMs,
     });
-    return parsed.response;
+    return {
+      text: parsed.response,
+      modelLabel: getModelDisplayLabel(parsed),
+      modelUsed: parsed.modelUsed,
+      providerUsed: parsed.providerUsed,
+    };
   } catch (error: any) {
     const errorMessage = error?.message || error?.errors?.[0]?.message || "";
     if (errorMessage.includes("Anonymous daily AI chat limit reached")) {
@@ -200,6 +240,15 @@ export async function chatWithGemini(
     }
     throw error;
   }
+}
+
+export async function chatWithGemini(
+  messages: { role: "user" | "assistant"; content: string }[],
+  systemPrompt?: string,
+  options?: { maxOutputTokens?: number }
+): Promise<string> {
+  const result = await chatWithGeminiResult(messages, systemPrompt, options);
+  return result.text;
 }
 
 export interface ExtractedJournalFields {
