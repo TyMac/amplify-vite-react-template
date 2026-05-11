@@ -634,10 +634,13 @@ export default function JournalPage() {
                 </button>
                 <button
                   onClick={() => setTimelineOpen(false)}
-                  className="btn btn-ghost btn-xs"
+                  className="btn btn-ghost btn-xs btn-square"
                   title="Collapse timeline column"
+                  aria-label="Collapse timeline column"
                 >
-                  Collapse
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
                 </button>
               </div>
             </div>
