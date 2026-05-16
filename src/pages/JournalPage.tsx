@@ -9,6 +9,7 @@ import { useTimezone } from "../contexts/TimezoneContext";
 import { batchColor } from "../services/coffeeBatch";
 import JournalPhotoGallery from "../components/JournalPhotoGallery";
 import JournalRecipeGallery from "../components/JournalRecipeGallery";
+import JournalCalendar from "../components/JournalCalendar";
 
 const client = generateClient<Schema>();
 
@@ -22,23 +23,6 @@ function formatDateKey(dateStr: string, timezone: string): string {
   const m = parts.find(p => p.type === "month")?.value ?? "";
   const d = parts.find(p => p.type === "day")?.value ?? "";
   return `${y}-${m}-${d}`;
-}
-
-function formatShortDate(dateStr: string, timezone: string): string {
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    weekday: "short", month: "short", day: "numeric", timeZone: timezone,
-  });
-}
-
-function generateDaysList(days: number, timezone: string): string[] {
-  const result: string[] = [];
-  const today = new Date();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    result.push(formatDateKey(d.toISOString(), timezone));
-  }
-  return result;
 }
 
 export default function JournalPage() {
@@ -85,6 +69,7 @@ export default function JournalPage() {
     } catch {}
     return typeof window !== "undefined" ? window.innerWidth >= 1280 : true;
   });
+  const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(() => new Set());
 
   const preLinkChatId = searchParams.get("chatId");
 
@@ -194,38 +179,6 @@ export default function JournalPage() {
     );
   }, [chatSessions, allJournalTags]);
 
-  // ── Timeline ──────────────────────────────────────────────────────────
-  const timelineDays = useMemo(() => {
-    const days = generateDaysList(90, timezone);
-    const entriesByDate = new Map<string, Schema["BrewJournal"]["type"][]>();
-    entries.forEach((e) => {
-      if (!e.brewDate) return;
-      const key = formatDateKey(e.brewDate, timezone);
-      if (!entriesByDate.has(key)) entriesByDate.set(key, []);
-      entriesByDate.get(key)!.push(e);
-    });
-
-    const pinnedChatsByDate = new Map<string, { chat: Schema["ChatSession"]["type"] }[]>();
-    entries.forEach((e) => {
-      if (!e.brewDate || !e.chatSessionIds) return;
-      const key = formatDateKey(e.brewDate, timezone);
-      e.chatSessionIds.forEach((chatId) => {
-        if (!chatId) return;
-        const chat = chatSessions.find((c) => c.id === chatId);
-        if (chat) {
-          if (!pinnedChatsByDate.has(key)) pinnedChatsByDate.set(key, []);
-          pinnedChatsByDate.get(key)!.push({ chat });
-        }
-      });
-    });
-
-    return days.map((dateKey) => ({
-      dateKey,
-      entries: entriesByDate.get(dateKey) ?? [],
-      pinnedChats: pinnedChatsByDate.get(dateKey) ?? [],
-    }));
-  }, [entries, chatSessions, timezone]);
-
   // ── Actions ───────────────────────────────────────────────────────────
   function handleEntryClick(entryId: string) {
     setSelectedEntryId(entryId);
@@ -273,6 +226,15 @@ export default function JournalPage() {
 
   function isChatPinnedToSelected(chatId: string) {
     return (selectedEntry?.chatSessionIds ?? []).includes(chatId);
+  }
+
+  function toggleEntryExpanded(entryId: string) {
+    setExpandedEntryIds((current) => {
+      const next = new Set(current);
+      if (next.has(entryId)) next.delete(entryId);
+      else next.add(entryId);
+      return next;
+    });
   }
 
   if (loading) {
@@ -602,7 +564,7 @@ export default function JournalPage() {
         </div>
       </div>
 
-      {/* ── Right Pane: Timeline ── */}
+      {/* ── Right Pane: Journal entries + calendar ── */}
       <div className={`hidden lg:flex flex-col border-l border-base-200 bg-base-100 transition-all duration-200 ${timelineOpen ? "w-96" : "w-12"}`}>
 
         {/* Collapsed rail — just toggle button */}
@@ -611,13 +573,13 @@ export default function JournalPage() {
             <button
               onClick={() => setTimelineOpen(true)}
               className="btn btn-ghost btn-xs btn-square"
-              title="Expand timeline"
+              title="Expand journal column"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
               </svg>
             </button>
-            <span className="text-[11px] text-base-content/35 [writing-mode:vertical-lr] rotate-180 tracking-wider uppercase mt-2 text-center">Timeline</span>
+            <span className="text-[11px] text-base-content/35 [writing-mode:vertical-lr] rotate-180 tracking-wider uppercase mt-2 text-center">Journal</span>
           </div>
         )}
 
@@ -625,9 +587,14 @@ export default function JournalPage() {
         {timelineOpen && (
           <>
             <div className="p-3 border-b border-base-200 flex items-center justify-between">
-              <h2 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
-                Timeline
-              </h2>
+              <div>
+                <h2 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
+                  Journal Entries
+                </h2>
+                <p className="text-[11px] text-base-content/40">
+                  Newest to oldest
+                </p>
+              </div>
               <div className="flex items-center gap-1">
                 <button onClick={() => handleNewEntry()} className="btn btn-primary btn-xs">
                   + Start New Journal
@@ -635,8 +602,8 @@ export default function JournalPage() {
                 <button
                   onClick={() => setTimelineOpen(false)}
                   className="btn btn-ghost btn-xs btn-square"
-                  title="Collapse timeline column"
-                  aria-label="Collapse timeline column"
+                  title="Collapse journal column"
+                  aria-label="Collapse journal column"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -645,89 +612,133 @@ export default function JournalPage() {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
-              {timelineDays.map(({ dateKey, entries: dayEntries, pinnedChats }) => {
-                const hasContent = dayEntries.length > 0 || pinnedChats.length > 0;
-                // Highlight this date row if the selected entry falls on it
-                const isActiveDate = selectedDateKey === dateKey;
+            <div className="flex-1 min-h-0 overflow-y-auto p-2">
+              {entries.length === 0 ? (
+                <div className="p-4 text-center text-sm text-base-content/50">
+                  No journal entries yet.
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {entries.map((entry) => {
+                    const color = entry.coffeeBatchId
+                      ? batchColor(entry.coffeeBatchId)
+                      : "#6b7280";
+                    const isActiveEntry = selectedEntryId === entry.id;
+                    const isExpanded = expandedEntryIds.has(entry.id);
+                    const linkedChats = (entry.chatSessionIds ?? [])
+                      .filter((id): id is string => !!id)
+                      .map((chatId) => chatSessions.find((chat) => chat.id === chatId))
+                      .filter((chat): chat is Schema["ChatSession"]["type"] => !!chat);
 
-                if (!hasContent) {
-                  return (
-                    <button
-                      key={dateKey}
-                      onClick={() => handleDateClick(dateKey)}
-                      className={`w-full px-3 py-1.5 border-b border-base-100 cursor-pointer hover:bg-base-200/50 transition-colors text-center ${
-                        isActiveDate ? "bg-primary/5" : ""
-                      }`}
-                    >
-                      <span className={`block text-xs ${isActiveDate ? "text-primary font-medium" : "text-base-content/30"}`}>
-                        {formatShortDate(dateKey, timezone)}
-                      </span>
-                    </button>
-                  );
-                }
-
-                return (
-                  <div
-                    key={dateKey}
-                    className={`px-3 py-2 border-b border-base-200 transition-colors ${
-                      isActiveDate ? "bg-primary/8" : ""
-                    }`}
-                    style={isActiveDate ? { backgroundColor: "oklch(var(--p)/0.06)" } : {}}
-                  >
-                    <button
-                      type="button"
-                      className={`block w-full text-center text-xs font-medium mb-1.5 cursor-pointer hover:text-primary ${
-                        isActiveDate ? "text-primary" : "text-base-content/60"
-                      }`}
-                      onClick={() => handleDateClick(dateKey)}
-                    >
-                      {isActiveDate && <span className="mr-1">▸</span>}
-                      {formatShortDate(dateKey, timezone)}
-                    </button>
-                    <div className="flex flex-col gap-1">
-                      {dayEntries.map((entry) => {
-                        const color = entry.coffeeBatchId
-                          ? batchColor(entry.coffeeBatchId)
-                          : "#6b7280";
-                        const isActiveEntry = selectedEntryId === entry.id;
-                        return (
+                    return (
+                      <div
+                        key={entry.id}
+                        className={`rounded-xl border transition-colors ${
+                          isActiveEntry ? "bg-primary/5" : "bg-base-100 hover:bg-base-200/40"
+                        }`}
+                        style={{ borderColor: isActiveEntry ? color : undefined }}
+                      >
+                        <div className="flex items-stretch">
                           <button
-                            key={entry.id}
+                            type="button"
                             onClick={() => handleEntryClick(entry.id)}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border transition-all w-full text-left ${
-                              isActiveEntry ? "" : "bg-transparent hover:bg-base-200"
-                            }`}
-                            style={{
-                              borderColor: color,
-                              color: color,
-                              ...(isActiveEntry
-                                ? { backgroundColor: color + "28", boxShadow: `0 0 0 1.5px ${color}` }
-                                : {}),
-                            }}
+                            className="flex-1 min-w-0 text-left px-3 py-2.5"
                           >
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                            <span className="truncate">{entry.coffeeName}</span>
-                            {entry.rating != null && (
-                              <span className="ml-auto opacity-60 flex-shrink-0">{entry.rating}/10</span>
-                            )}
+                            <div className="flex items-start gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1.5" style={{ backgroundColor: color }} />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold truncate" style={{ color }}>
+                                    {entry.coffeeName}
+                                  </p>
+                                  {entry.rating != null && (
+                                    <span className="text-xs text-base-content/45 flex-shrink-0">{entry.rating}/10</span>
+                                  )}
+                                </div>
+                                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-base-content/45 min-w-0">
+                                  {entry.brewDate && (
+                                    <span className="flex-shrink-0">
+                                      {new Date(entry.brewDate).toLocaleDateString("en-US", {
+                                        month: "short", day: "numeric", year: "numeric", timeZone: timezone,
+                                      })}
+                                    </span>
+                                  )}
+                                  {entry.brewMethod && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="truncate">{entry.brewMethod}</span>
+                                    </>
+                                  )}
+                                </div>
+                                {entry.roaster && (
+                                  <p className="mt-0.5 text-xs text-base-content/40 truncate">{entry.roaster}</p>
+                                )}
+                              </div>
+                            </div>
                           </button>
-                        );
-                      })}
-                      {pinnedChats.map(({ chat }) => (
-                        <Link
-                          key={chat.id}
-                          to={`/chat/${chat.id}`}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full border border-secondary/50 text-secondary bg-transparent hover:bg-secondary/10 transition-colors w-full"
-                        >
-                          <span>💬</span>
-                          <span className="truncate">{chat.name}</span>
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleEntryExpanded(entry.id);
+                            }}
+                            className="btn btn-ghost btn-xs btn-square self-center mr-2 flex-shrink-0"
+                            aria-expanded={isExpanded}
+                            aria-label={`${isExpanded ? "Collapse" : "Expand"} chats for ${entry.coffeeName}`}
+                            title={`${isExpanded ? "Hide" : "Show"} associated chats`}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className={`w-4 h-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        </div>
+
+                        {isExpanded && (
+                          <div className="border-t border-base-200 px-3 py-2 bg-base-200/25 rounded-b-xl">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-base-content/45 mb-1.5">
+                              Associated Chats
+                            </p>
+                            {linkedChats.length === 0 ? (
+                              <p className="text-xs text-base-content/40">
+                                No chats associated with this journal entry yet.
+                              </p>
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                {linkedChats.map((chat) => (
+                                  <Link
+                                    key={chat.id}
+                                    to={`/chat/${chat.id}`}
+                                    className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs text-secondary hover:bg-secondary/10"
+                                  >
+                                    <span className="flex-shrink-0">💬</span>
+                                    <span className="truncate">{chat.name}</span>
+                                  </Link>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-base-200 p-3 bg-base-50">
+              <JournalCalendar
+                brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
+                selectedDate={selectedDateKey}
+                onSelectDate={(dateKey) => {
+                  if (dateKey) handleDateClick(dateKey);
+                }}
+              />
             </div>
           </>
         )}
