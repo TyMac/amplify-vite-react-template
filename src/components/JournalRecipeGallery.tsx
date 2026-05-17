@@ -322,7 +322,11 @@ export default function JournalRecipeGallery({
                       </p>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      {recipe.isFavorite && <span className="badge badge-xs badge-warning">Favorite</span>}
+                      {recipe.isFavorite && (
+                        <span className="text-warning text-base leading-none" aria-label="Favorite" title="Favorite">
+                          ★
+                        </span>
+                      )}
                       <span className="badge badge-xs badge-outline">View</span>
                     </div>
                   </div>

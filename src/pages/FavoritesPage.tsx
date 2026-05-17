@@ -151,10 +151,7 @@ export default function FavoritesPage() {
               className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 transition-all text-left"
             >
               <div className="card-body p-5">
-                <div className="flex items-start justify-between gap-3">
-                  <h2 className="card-title text-base font-semibold text-base-content leading-snug">{recipe.title}</h2>
-                  <span className="badge badge-warning badge-sm flex-shrink-0">Favorite</span>
-                </div>
+                <h2 className="card-title text-base font-semibold text-base-content leading-snug">{recipe.title}</h2>
                 <p className="text-sm text-base-content/60 line-clamp-3 min-h-[3.75rem]">
                   {recipe.summary || recipe.recipeName}
                 </p>
