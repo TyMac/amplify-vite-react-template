@@ -170,6 +170,7 @@ const schema = a.schema({
 
       // Equipment
       grinder: a.string(),
+      filterPaper: a.string(),
       dripper: a.string(),
       kettle: a.string(),
       scale: a.string(),

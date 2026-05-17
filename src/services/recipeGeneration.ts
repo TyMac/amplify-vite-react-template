@@ -117,6 +117,7 @@ export function buildRecipeContextMessage(context: RecipeGenerationContext): str
 
   const equipmentLines = [
     preference?.grinder && preference.grinder !== "None" ? `Grinder: ${preference.grinder}` : null,
+    preference?.filterPaper && preference.filterPaper !== "None" ? `Filter paper: ${preference.filterPaper}` : null,
     preference?.dripper && preference.dripper !== "None" ? `Dripper: ${preference.dripper}` : null,
     preference?.kettle && preference.kettle !== "None" ? `Kettle: ${preference.kettle}` : null,
     preference?.scale && preference.scale !== "None" ? `Scale: ${preference.scale}` : null,

@@ -8,7 +8,8 @@ import type { Schema } from "../../amplify/data/resource";
 const client = generateClient<Schema>();
 
 // Equipment options (shared with barista-mobile)
-const GRINDERS = ["None","Baratza Encore","Baratza Virtuoso+","1Zpresso JX-Pro","Comandante C40","Fellow Ode","Timemore Chestnut","Other"];
+const GRINDERS = ["None","Baratza Encore","Baratza Virtuoso+","1Zpresso JX-Pro","1Zpresso ZP6 S","Comandante C40","Fellow Ode","Timemore Chestnut","Other"];
+const FILTER_PAPERS = ["None","Hario V60 tabbed (V02)","Hario V60 untabbed","CAFEC T-90","CAFEC T-92","CAFEC Abaca","Kalita Wave 155","Kalita Wave 185","Chemex Bonded Filters","AeroPress Micro-Filters","Sibarist FAST","Sibarist original","Other"];
 const DRIPPERS = ["None","Hario V60 01","Hario V60 02","Hario V60 03","Kalita Wave 155","Kalita Wave 185","Chemex 6-cup","Chemex 8-cup","Fellow Stagg [X]","AeroPress","Other"];
 const KETTLES = ["None","Fellow Stagg EKG","Hario Buono","Bonavita Variable Temp","Brewista Artisan","Timemore Fish","Other"];
 const SCALES = ["None","Acaia Pearl","Acaia Lunar","Timemore Black Mirror","Hario Drip Scale","Brewista Smart Scale","Other"];
@@ -49,6 +50,7 @@ export default function ProfilePage() {
   const [prefId, setPrefId] = useState<string | null>(null);
   const [selectedTz, setSelectedTz] = useState(timezone);
   const [grinder, setGrinder] = useState("None");
+  const [filterPaper, setFilterPaper] = useState("None");
   const [dripper, setDripper] = useState("None");
   const [kettle, setKettle] = useState("None");
   const [scale, setScale] = useState("None");
@@ -71,6 +73,7 @@ export default function ProfilePage() {
           setPrefId(pref.id);
           if (pref.timezone) setSelectedTz(pref.timezone);
           if (pref.grinder) setGrinder(pref.grinder);
+          if (pref.filterPaper) setFilterPaper(pref.filterPaper);
           if (pref.dripper) setDripper(pref.dripper);
           if (pref.kettle) setKettle(pref.kettle);
           if (pref.scale) setScale(pref.scale);
@@ -89,6 +92,7 @@ export default function ProfilePage() {
       const prefData = {
         timezone: selectedTz,
         grinder: grinder !== "None" ? grinder : null,
+        filterPaper: filterPaper !== "None" ? filterPaper : null,
         dripper: dripper !== "None" ? dripper : null,
         kettle: kettle !== "None" ? kettle : null,
         scale: scale !== "None" ? scale : null,
@@ -191,6 +195,12 @@ export default function ProfilePage() {
               <label className="label py-1"><span className="label-text text-sm">Grinder</span></label>
               <select value={grinder} onChange={(e) => setGrinder(e.target.value)} className="select select-bordered w-full select-sm">
                 {GRINDERS.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label py-1"><span className="label-text text-sm">Filter Paper</span></label>
+              <select value={filterPaper} onChange={(e) => setFilterPaper(e.target.value)} className="select select-bordered w-full select-sm">
+                {FILTER_PAPERS.map((f) => <option key={f} value={f}>{f}</option>)}
               </select>
             </div>
             <div>

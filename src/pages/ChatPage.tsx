@@ -114,6 +114,7 @@ export default function ChatPage() {
         if (pref) {
           const lines: string[] = [];
           if (pref.grinder && pref.grinder !== "None") lines.push(`Grinder: ${pref.grinder}`);
+          if (pref.filterPaper && pref.filterPaper !== "None") lines.push(`Filter paper: ${pref.filterPaper}`);
           if (pref.dripper && pref.dripper !== "None") lines.push(`Dripper: ${pref.dripper}`);
           if (pref.kettle && pref.kettle !== "None") lines.push(`Kettle: ${pref.kettle}`);
           if (pref.scale && pref.scale !== "None") lines.push(`Scale: ${pref.scale}`);
