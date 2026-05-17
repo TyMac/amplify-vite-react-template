@@ -61,6 +61,14 @@ export default function JournalPage() {
     } catch {}
     return true;
   });
+  // Calendar section — open by default
+  const [calendarOpen, setCalendarOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem("journal_calendar_open");
+      if (saved !== null) return saved === "true";
+    } catch {}
+    return true;
+  });
   // Timeline panel — open by default on wide screens (≥1280px), collapsed on narrower
   const [timelineOpen, setTimelineOpen] = useState(() => {
     try {
@@ -109,6 +117,11 @@ export default function JournalPage() {
   useEffect(() => {
     try { localStorage.setItem("journal_recipe_gallery_open", String(recipeGalleryOpen)); } catch {}
   }, [recipeGalleryOpen]);
+
+  // Persist calendar section open/closed preference
+  useEffect(() => {
+    try { localStorage.setItem("journal_calendar_open", String(calendarOpen)); } catch {}
+  }, [calendarOpen]);
 
   // Handle pre-linked chat from URL
   useEffect(() => {
@@ -731,14 +744,33 @@ export default function JournalPage() {
               )}
             </div>
 
-            <div className="border-t border-base-200 p-3 bg-base-50">
-              <JournalCalendar
-                brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
-                selectedDate={selectedDateKey}
-                onSelectDate={(dateKey) => {
-                  if (dateKey) handleDateClick(dateKey);
-                }}
-              />
+            <div className="border-t border-base-200 bg-base-50">
+              <button
+                onClick={() => setCalendarOpen(!calendarOpen)}
+                className="w-full p-3 flex items-center justify-between hover:bg-base-200 transition-colors"
+              >
+                <h3 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">Calendar</h3>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className={`w-4 h-4 transition-transform ${calendarOpen ? "" : "-rotate-90"}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                </svg>
+              </button>
+              {calendarOpen && (
+                <div className="px-3 pb-3">
+                  <JournalCalendar
+                    brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
+                    selectedDate={selectedDateKey}
+                    onSelectDate={(dateKey) => {
+                      if (dateKey) handleDateClick(dateKey);
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </>
         )}
