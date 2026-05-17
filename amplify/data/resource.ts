@@ -373,6 +373,7 @@ const schema = a.schema({
       summary: a.string(),
       fileName: a.string().required(),
       s3Key: a.string().required(),
+      isFavorite: a.boolean().default(false),
 
       generatedAt: a.datetime(),
     })

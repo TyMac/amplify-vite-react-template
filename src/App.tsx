@@ -11,6 +11,7 @@ import ChatPage from "./pages/ChatPage";
 import JournalPage from "./pages/JournalPage";
 import JournalEntryForm from "./pages/JournalEntryForm";
 import JournalEntryDetail from "./pages/JournalEntryDetail";
+import FavoritesPage from "./pages/FavoritesPage";
 import ProfilePage from "./pages/ProfilePage";
 import CoffeeBatchPage from "./pages/CoffeeBatchPage";
 import "./App.css";
@@ -31,8 +32,9 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
 
   const navLinks = [
     { to: "/", label: "Home", active: location.pathname === "/" },
-    { to: "/chat", label: "Coffee Talk", active: location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") },
     { to: "/journal", label: "Journal", active: location.pathname.startsWith("/journal") },
+    { to: "/chat", label: "Coffee Talk", active: location.pathname.startsWith("/chat") && !location.pathname.startsWith("/chats") },
+    { to: "/favorites", label: "Favorites", active: location.pathname === "/favorites" },
     { to: "/chats", label: "History", active: location.pathname === "/chats" },
   ];
 
@@ -166,19 +168,6 @@ function HomePage() {
             {/* Action Cards */}
             <div className="w-full max-w-md flex flex-col gap-5">
               <Link
-                to="/chat"
-                className="card bg-coffee text-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
-              >
-                <div className="card-body items-center text-center py-8">
-                  <span className="text-3xl mb-2">☕</span>
-                  <h2 className="card-title text-xl font-semibold">Coffee Talk</h2>
-                  <p className="text-white/80 text-sm font-light">
-                    Get personalized brew recipes and coffee advice
-                  </p>
-                </div>
-              </Link>
-
-              <Link
                 to="/journal"
                 className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
               >
@@ -189,6 +178,19 @@ function HomePage() {
                   </h2>
                   <p className="text-base-content/50 text-sm font-light">
                     Log your brews, track flavor notes, and see your palate evolve.
+                  </p>
+                </div>
+              </Link>
+
+              <Link
+                to="/chat"
+                className="card bg-coffee text-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
+              >
+                <div className="card-body items-center text-center py-8">
+                  <span className="text-3xl mb-2">☕</span>
+                  <h2 className="card-title text-xl font-semibold">Coffee Talk</h2>
+                  <p className="text-white/80 text-sm font-light">
+                    Get personalized brew recipes and coffee advice
                   </p>
                 </div>
               </Link>
@@ -235,6 +237,19 @@ function ChatsPage() {
         <div className="min-h-screen bg-base-300">
           <NavBar user={user} signOut={signOut} />
           <ChatHistoryPage />
+        </div>
+      )}
+    </Authenticator>
+  );
+}
+
+function FavoritesPageWrapper() {
+  return (
+    <Authenticator>
+      {({ signOut, user }) => (
+        <div className="min-h-screen bg-base-300">
+          <NavBar user={user} signOut={signOut} />
+          <FavoritesPage />
         </div>
       )}
     </Authenticator>
@@ -321,6 +336,7 @@ function App() {
             <Route path="/journal/new" element={<JournalEntryFormWrapper />} />
             <Route path="/journal/:id" element={<JournalEntryDetailWrapper />} />
             <Route path="/journal/:id/edit" element={<JournalEntryFormWrapper />} />
+            <Route path="/favorites" element={<FavoritesPageWrapper />} />
             <Route path="/chats" element={<ChatsPage />} />
             <Route path="/profile" element={<ProfilePageWrapper />} />
             <Route path="/batches" element={<CoffeeBatchWrapper />} />

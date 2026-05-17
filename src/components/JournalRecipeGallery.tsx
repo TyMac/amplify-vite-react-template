@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import { generateClient } from "aws-amplify/data";
 import { getUrl, uploadData } from "aws-amplify/storage";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type { Schema } from "../../amplify/data/resource";
+import RecipeMarkdown from "./RecipeMarkdown";
 import { generateRecipeDraft, renderRecipeMarkdown } from "../services/recipeGeneration";
 
 const client = generateClient<Schema>({ authMode: "userPool" });
@@ -14,26 +13,6 @@ type CoffeeBatch = Schema["CoffeeBatch"]["type"];
 type ChatSession = Schema["ChatSession"]["type"];
 type UserPreference = Schema["UserPreference"]["type"];
 type GeneratedRecipe = Schema["GeneratedRecipe"]["type"];
-
-const recipeMarkdownComponents: Components = {
-  h1: ({ children }) => <h1 className="text-2xl font-semibold text-base-content mb-4 leading-tight">{children}</h1>,
-  h2: ({ children }) => <h2 className="text-lg font-semibold text-coffee mt-7 mb-3 border-b border-base-200 pb-2">{children}</h2>,
-  h3: ({ children }) => <h3 className="text-base font-semibold text-base-content mt-5 mb-2">{children}</h3>,
-  p: ({ children }) => <p className="text-sm leading-7 text-base-content/80 mb-3">{children}</p>,
-  strong: ({ children }) => <strong className="font-semibold text-base-content">{children}</strong>,
-  ul: ({ children }) => <ul className="list-disc pl-5 space-y-1.5 text-sm leading-7 text-base-content/80 mb-4">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-5 space-y-2 text-sm leading-7 text-base-content/80 mb-4">{children}</ol>,
-  li: ({ children }) => <li className="pl-1">{children}</li>,
-  table: ({ children }) => (
-    <div className="overflow-x-auto rounded-lg border border-base-200 mb-5">
-      <table className="table table-zebra table-sm w-full text-sm">{children}</table>
-    </div>
-  ),
-  thead: ({ children }) => <thead className="bg-base-200/70 text-base-content">{children}</thead>,
-  th: ({ children }) => <th className="font-semibold text-base-content whitespace-nowrap">{children}</th>,
-  td: ({ children }) => <td className="align-top text-base-content/80">{children}</td>,
-  hr: () => <div className="divider my-6" />,
-};
 
 interface JournalRecipeGalleryProps {
   journalEntry: JournalEntry | null;
@@ -56,6 +35,7 @@ export default function JournalRecipeGallery({
   const [loadingRecipes, setLoadingRecipes] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [favoriteUpdatingId, setFavoriteUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -183,6 +163,7 @@ export default function JournalRecipeGallery({
         fileName,
         s3Key: uploadResult.path,
         summary: draft.overview,
+        isFavorite: false,
         generatedAt,
       };
       if (batch?.id) recipeRecord.sourceBatchId = batch.id;
@@ -222,6 +203,26 @@ export default function JournalRecipeGallery({
       setError("Unable to download the recipe right now.");
     } finally {
       setDownloadingId(null);
+    }
+  }
+
+  async function handleToggleFavorite(recipe: GeneratedRecipe) {
+    const nextIsFavorite = !recipe.isFavorite;
+    setFavoriteUpdatingId(recipe.id);
+    setError(null);
+    try {
+      const { data: updatedRecipe } = await client.models.GeneratedRecipe.update({
+        id: recipe.id,
+        isFavorite: nextIsFavorite,
+      });
+      const mergedRecipe = { ...recipe, ...(updatedRecipe ?? {}), isFavorite: nextIsFavorite } as GeneratedRecipe;
+      setRecipes((current) => current.map((item) => (item.id === recipe.id ? mergedRecipe : item)));
+      setModalRecipe((current) => (current?.id === recipe.id ? mergedRecipe : current));
+    } catch (err) {
+      console.error("Failed to update recipe favorite", err);
+      setError("Unable to update favorite status.");
+    } finally {
+      setFavoriteUpdatingId(null);
     }
   }
 
@@ -320,7 +321,10 @@ export default function JournalRecipeGallery({
                         {recipe.summary || recipe.recipeName}
                       </p>
                     </div>
-                    <span className="badge badge-xs badge-outline flex-shrink-0">View</span>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {recipe.isFavorite && <span className="badge badge-xs badge-warning">Favorite</span>}
+                      <span className="badge badge-xs badge-outline">View</span>
+                    </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <p className="text-xs text-base-content/30">
@@ -380,10 +384,23 @@ export default function JournalRecipeGallery({
               <div className="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => void handleDownloadRecipe(modalRecipe)}
-                  disabled={downloadingId === modalRecipe.id}
+                  disabled={downloadingId === modalRecipe.id || favoriteUpdatingId === modalRecipe.id}
                   className="btn btn-primary btn-sm"
                 >
                   {downloadingId === modalRecipe.id ? <span className="loading loading-spinner loading-xs" /> : "Download"}
+                </button>
+                <button
+                  onClick={() => void handleToggleFavorite(modalRecipe)}
+                  disabled={favoriteUpdatingId === modalRecipe.id || downloadingId === modalRecipe.id}
+                  className={modalRecipe.isFavorite ? "btn btn-warning btn-sm" : "btn btn-outline btn-sm"}
+                >
+                  {favoriteUpdatingId === modalRecipe.id ? (
+                    <span className="loading loading-spinner loading-xs" />
+                  ) : modalRecipe.isFavorite ? (
+                    "Remove Favorite"
+                  ) : (
+                    "Add to Favorites"
+                  )}
                 </button>
                 <button
                   onClick={() => setModalRecipe(null)}
@@ -405,9 +422,7 @@ export default function JournalRecipeGallery({
                 </div>
               ) : modalMarkdown ? (
                 <div className="recipe-markdown max-w-none">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={recipeMarkdownComponents}>
-                    {stripRecipeFrontmatter(modalMarkdown)}
-                  </ReactMarkdown>
+                  <RecipeMarkdown markdown={modalMarkdown} />
                 </div>
               ) : (
                 <div className="flex items-center justify-center py-16 text-sm text-base-content/40">
@@ -437,10 +452,6 @@ async function fetchRecipeMarkdown(s3Key: string): Promise<string> {
   const response = await fetch(url.toString());
   if (!response.ok) throw new Error(`Preview failed (${response.status})`);
   return response.text();
-}
-
-function stripRecipeFrontmatter(markdown: string): string {
-  return markdown.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, "").trim();
 }
 
 function buildRecipeFileName(title: string, generatedAt: string, userId: string): string {
