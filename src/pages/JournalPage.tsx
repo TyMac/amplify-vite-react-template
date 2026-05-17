@@ -589,7 +589,7 @@ export default function JournalPage() {
             <div className="p-3 border-b border-base-200 flex items-center justify-between">
               <div>
                 <h2 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">
-                  Journal Entries
+                  Journal Catalogue
                 </h2>
                 <p className="text-[11px] text-base-content/40">
                   Newest to oldest
