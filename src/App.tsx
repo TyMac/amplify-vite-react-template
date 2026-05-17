@@ -50,7 +50,11 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
       <div className="hidden sm:flex flex-none">
         <nav className="flex items-center gap-1">
           {navLinks.map(({ to, label, active }) => (
-            <Link key={to} to={to} className={`btn btn-ghost btn-sm ${active ? "text-coffee" : ""}`}>
+            <Link
+              key={to}
+              to={to}
+              className={`px-3 py-1.5 text-sm transition-colors ${active ? "text-coffee font-medium" : "text-base-content/70"}`}
+            >
               {label}
             </Link>
           ))}
