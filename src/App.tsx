@@ -169,14 +169,14 @@ function HomePage() {
             <div className="w-full max-w-md flex flex-col gap-5">
               <Link
                 to="/journal"
-                className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+                className="card bg-coffee text-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
               >
-                <div className="card-body items-center text-center py-6">
-                  <span className="text-2xl mb-2">📓</span>
-                  <h2 className="card-title text-lg font-medium text-coffee">
+                <div className="card-body items-center text-center py-8">
+                  <span className="text-3xl mb-2">📓</span>
+                  <h2 className="card-title text-xl font-semibold">
                     Coffee Journal
                   </h2>
-                  <p className="text-base-content/50 text-sm font-light">
+                  <p className="text-white/80 text-sm font-light">
                     Log your brews, track flavor notes, and see your palate evolve.
                   </p>
                 </div>
@@ -184,12 +184,12 @@ function HomePage() {
 
               <Link
                 to="/chat"
-                className="card bg-coffee text-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
+                className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
               >
-                <div className="card-body items-center text-center py-8">
-                  <span className="text-3xl mb-2">☕</span>
-                  <h2 className="card-title text-xl font-semibold">Coffee Talk</h2>
-                  <p className="text-white/80 text-sm font-light">
+                <div className="card-body items-center text-center py-6">
+                  <span className="text-2xl mb-2">☕</span>
+                  <h2 className="card-title text-lg font-medium text-coffee">Coffee Talk</h2>
+                  <p className="text-base-content/50 text-sm font-light">
                     Get personalized brew recipes and coffee advice
                   </p>
                 </div>
