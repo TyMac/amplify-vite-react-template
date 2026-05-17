@@ -50,7 +50,7 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
       <div className="hidden sm:flex flex-none">
         <nav className="flex items-center gap-1">
           {navLinks.map(({ to, label, active }) => (
-            <Link key={to} to={to} className={`btn btn-ghost btn-sm ${active ? "text-primary" : ""}`}>
+            <Link key={to} to={to} className={`btn btn-ghost btn-sm ${active ? "text-coffee" : ""}`}>
               {label}
             </Link>
           ))}
@@ -63,7 +63,7 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
         {user && (
           <div className="dropdown dropdown-end">
             <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar placeholder">
-              <div className="bg-primary text-primary-content rounded-full w-8">
+              <div className="bg-coffee text-white rounded-full w-8">
                 <span className="text-xs font-semibold">{initial}</span>
               </div>
             </div>
@@ -105,7 +105,7 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
           <ul tabIndex={0} className="dropdown-content bg-base-100 rounded-box z-10 w-56 p-2 shadow-lg border border-base-200 mt-1">
             {navLinks.map(({ to, label, active }) => (
               <li key={to}>
-                <Link to={to} className={`block px-3 py-2 text-sm rounded-lg hover:bg-base-200 transition-colors ${active ? "text-primary font-medium" : ""}`}>{label}</Link>
+                <Link to={to} className={`block px-3 py-2 text-sm rounded-lg hover:bg-base-200 transition-colors ${active ? "text-coffee font-medium" : ""}`}>{label}</Link>
               </li>
             ))}
             {user && (
