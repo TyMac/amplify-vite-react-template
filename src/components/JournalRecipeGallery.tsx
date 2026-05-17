@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuthenticator } from "@aws-amplify/ui-react";
 import { generateClient } from "aws-amplify/data";
 import { getUrl, uploadData } from "aws-amplify/storage";
+import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { Schema } from "../../amplify/data/resource";
 import { generateRecipeDraft, renderRecipeMarkdown } from "../services/recipeGeneration";
 
@@ -12,6 +14,26 @@ type CoffeeBatch = Schema["CoffeeBatch"]["type"];
 type ChatSession = Schema["ChatSession"]["type"];
 type UserPreference = Schema["UserPreference"]["type"];
 type GeneratedRecipe = Schema["GeneratedRecipe"]["type"];
+
+const recipeMarkdownComponents: Components = {
+  h1: ({ children }) => <h1 className="text-2xl font-semibold text-base-content mb-4 leading-tight">{children}</h1>,
+  h2: ({ children }) => <h2 className="text-lg font-semibold text-coffee mt-7 mb-3 border-b border-base-200 pb-2">{children}</h2>,
+  h3: ({ children }) => <h3 className="text-base font-semibold text-base-content mt-5 mb-2">{children}</h3>,
+  p: ({ children }) => <p className="text-sm leading-7 text-base-content/80 mb-3">{children}</p>,
+  strong: ({ children }) => <strong className="font-semibold text-base-content">{children}</strong>,
+  ul: ({ children }) => <ul className="list-disc pl-5 space-y-1.5 text-sm leading-7 text-base-content/80 mb-4">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-5 space-y-2 text-sm leading-7 text-base-content/80 mb-4">{children}</ol>,
+  li: ({ children }) => <li className="pl-1">{children}</li>,
+  table: ({ children }) => (
+    <div className="overflow-x-auto rounded-lg border border-base-200 mb-5">
+      <table className="table table-zebra table-sm w-full text-sm">{children}</table>
+    </div>
+  ),
+  thead: ({ children }) => <thead className="bg-base-200/70 text-base-content">{children}</thead>,
+  th: ({ children }) => <th className="font-semibold text-base-content whitespace-nowrap">{children}</th>,
+  td: ({ children }) => <td className="align-top text-base-content/80">{children}</td>,
+  hr: () => <div className="divider my-6" />,
+};
 
 interface JournalRecipeGalleryProps {
   journalEntry: JournalEntry | null;
@@ -382,7 +404,11 @@ export default function JournalRecipeGallery({
                   <span className="loading loading-spinner loading-md text-primary" />
                 </div>
               ) : modalMarkdown ? (
-                <pre className="whitespace-pre-wrap text-sm leading-6 text-base-content/80 font-mono">{modalMarkdown}</pre>
+                <div className="recipe-markdown max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={recipeMarkdownComponents}>
+                    {stripRecipeFrontmatter(modalMarkdown)}
+                  </ReactMarkdown>
+                </div>
               ) : (
                 <div className="flex items-center justify-center py-16 text-sm text-base-content/40">
                   Unable to load recipe content.
@@ -411,6 +437,10 @@ async function fetchRecipeMarkdown(s3Key: string): Promise<string> {
   const response = await fetch(url.toString());
   if (!response.ok) throw new Error(`Preview failed (${response.status})`);
   return response.text();
+}
+
+function stripRecipeFrontmatter(markdown: string): string {
+  return markdown.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, "").trim();
 }
 
 function buildRecipeFileName(title: string, generatedAt: string, userId: string): string {
