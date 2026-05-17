@@ -69,6 +69,7 @@ export default function JournalPage() {
     } catch {}
     return true;
   });
+  const [calendarModalOpen, setCalendarModalOpen] = useState(false);
   // Timeline panel — open by default on wide screens (≥1280px), collapsed on narrower
   const [timelineOpen, setTimelineOpen] = useState(() => {
     try {
@@ -745,11 +746,22 @@ export default function JournalPage() {
             </div>
 
             <div className="border-t border-base-200 bg-base-50">
-              <button
-                onClick={() => setCalendarOpen(!calendarOpen)}
-                className="w-full p-3 flex items-center justify-between hover:bg-base-200 transition-colors"
-              >
-                <h3 className="text-xs font-semibold text-base-content/70 uppercase tracking-wider">Calendar</h3>
+              <div className="w-full p-3 flex items-center justify-between hover:bg-base-200 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => setCalendarModalOpen(true)}
+                  className="text-xs font-semibold text-base-content/70 hover:text-coffee uppercase tracking-wider underline-offset-2 hover:underline"
+                >
+                  Calendar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarOpen(!calendarOpen)}
+                  className="btn btn-ghost btn-xs btn-square"
+                  aria-expanded={calendarOpen}
+                  aria-label={`${calendarOpen ? "Hide" : "Show"} calendar`}
+                  title={`${calendarOpen ? "Hide" : "Show"} calendar`}
+                >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className={`w-4 h-4 transition-transform ${calendarOpen ? "" : "-rotate-90"}`}
@@ -760,6 +772,7 @@ export default function JournalPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                 </svg>
               </button>
+              </div>
               {calendarOpen && (
                 <div className="px-3 pb-3">
                   <JournalCalendar
@@ -775,6 +788,49 @@ export default function JournalPage() {
           </>
         )}
       </div>
+
+      {calendarModalOpen && (
+        <div className="modal modal-open" role="dialog" aria-modal="true">
+          <div className="modal-box max-w-3xl w-11/12 p-0 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-base-200">
+              <div>
+                <h2 className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Calendar</h2>
+                <p className="text-xs text-base-content/45">Click a brew date to jump to that journal entry.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCalendarModalOpen(false)}
+                className="btn btn-ghost btn-sm btn-square"
+                aria-label="Close calendar"
+                title="Close calendar"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5">
+              <JournalCalendar
+                size="large"
+                brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
+                selectedDate={selectedDateKey}
+                onSelectDate={(dateKey) => {
+                  if (dateKey) {
+                    handleDateClick(dateKey);
+                    setCalendarModalOpen(false);
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            className="modal-backdrop"
+            onClick={() => setCalendarModalOpen(false)}
+            aria-label="Close calendar"
+          >
+            close
+          </button>
+        </div>
+      )}
 
       {/* Mobile FAB */}
       <div className="lg:hidden fixed bottom-20 right-4 z-10">

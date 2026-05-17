@@ -4,6 +4,7 @@ interface JournalCalendarProps {
   brewDates: string[];
   selectedDate: string | null;
   onSelectDate: (date: string | null) => void;
+  size?: "default" | "large";
 }
 
 function getDaysInMonth(year: number, month: number): number {
@@ -22,6 +23,7 @@ export default function JournalCalendar({
   brewDates,
   selectedDate,
   onSelectDate,
+  size = "default",
 }: JournalCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const year = currentDate.getFullYear();
@@ -59,6 +61,7 @@ export default function JournalCalendar({
   };
 
   const monthName = currentDate.toLocaleString("default", { month: "long" });
+  const isLarge = size === "large";
 
   const days: (number | null)[] = [];
   for (let i = 0; i < firstDayOfMonth; i++) {
@@ -78,20 +81,20 @@ export default function JournalCalendar({
 
   return (
     <div className="card bg-base-100 shadow-sm border border-base-200">
-      <div className="card-body p-4">
-        <div className="flex items-center justify-between mb-4">
-          <button onClick={goToPreviousMonth} className="btn btn-ghost btn-sm">
+      <div className={`card-body ${isLarge ? "p-6" : "p-4"}`}>
+        <div className={`flex items-center justify-between ${isLarge ? "mb-6" : "mb-4"}`}>
+          <button onClick={goToPreviousMonth} className={`btn btn-ghost ${isLarge ? "btn-md" : "btn-sm"}`}>
             ←
           </button>
-          <h3 className="font-semibold text-base-content">
+          <h3 className={`font-semibold text-base-content ${isLarge ? "text-xl" : ""}`}>
             {monthName} {year}
           </h3>
-          <button onClick={goToNextMonth} className="btn btn-ghost btn-sm">
+          <button onClick={goToNextMonth} className={`btn btn-ghost ${isLarge ? "btn-md" : "btn-sm"}`}>
             →
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-base-content/50 mb-2">
+        <div className={`grid grid-cols-7 gap-1 text-center font-medium text-base-content/50 mb-2 ${isLarge ? "text-sm" : "text-xs"}`}>
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div key={d}>{d}</div>
           ))}
@@ -115,7 +118,7 @@ export default function JournalCalendar({
                     type="button"
                     onClick={() => handleDayClick(day)}
                     disabled={!hasEntry}
-                    className={`h-10 flex flex-col items-center justify-center rounded-lg transition-colors ${
+                    className={`${isLarge ? "h-16" : "h-10"} flex flex-col items-center justify-center rounded-lg transition-colors ${
                       isSelected
                         ? "ring-2 ring-primary bg-primary/10"
                         : hasEntry
@@ -123,8 +126,8 @@ export default function JournalCalendar({
                         : "opacity-50 cursor-default"
                     }`}
                   >
-                    <span className="text-sm">{day}</span>
-                    {hasEntry && <span className="text-[10px] leading-none">☕</span>}
+                    <span className={isLarge ? "text-base" : "text-sm"}>{day}</span>
+                    {hasEntry && <span className={`${isLarge ? "text-xs" : "text-[10px]"} leading-none`}>☕</span>}
                   </button>
                 );
               })}
