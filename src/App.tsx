@@ -40,7 +40,7 @@ function NavBar({ user, signOut }: { user?: { username?: string }; signOut?: () 
     <div className="navbar bg-base-100 border-b border-base-200 px-4 sticky top-0 z-50">
       {/* Brand */}
       <div className="flex-1">
-        <Link to="/" className="flex items-center gap-2 text-primary font-light text-xl tracking-widest">
+        <Link to="/" className="flex items-center gap-2 text-coffee font-light text-xl tracking-widest">
           <span className="text-2xl">☕</span>
           Barizta.AI
         </Link>
@@ -151,7 +151,7 @@ function HomePage() {
             {/* Hero */}
             <div className="text-center mb-12">
               <span className="text-5xl mb-4 block">☕</span>
-              <h1 className="text-3xl font-light tracking-[0.2em] text-base-content mb-3">
+              <h1 className="text-3xl font-light tracking-[0.2em] text-coffee mb-3">
                 Barizta.AI
               </h1>
               <p className="text-base-content/60 text-sm italic font-light max-w-md">
@@ -163,12 +163,12 @@ function HomePage() {
             <div className="w-full max-w-md flex flex-col gap-5">
               <Link
                 to="/chat"
-                className="card bg-primary text-primary-content shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
+                className="card bg-coffee text-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
               >
                 <div className="card-body items-center text-center py-8">
                   <span className="text-3xl mb-2">☕</span>
                   <h2 className="card-title text-xl font-semibold">Coffee Talk</h2>
-                  <p className="text-primary-content/80 text-sm font-light">
+                  <p className="text-white/80 text-sm font-light">
                     Get personalized brew recipes and coffee advice
                   </p>
                 </div>
@@ -180,7 +180,7 @@ function HomePage() {
               >
                 <div className="card-body items-center text-center py-6">
                   <span className="text-2xl mb-2">📓</span>
-                  <h2 className="card-title text-lg font-medium text-primary">
+                  <h2 className="card-title text-lg font-medium text-coffee">
                     Coffee Journal
                   </h2>
                   <p className="text-base-content/50 text-sm font-light">
@@ -195,7 +195,7 @@ function HomePage() {
               >
                 <div className="card-body items-center text-center py-6">
                   <span className="text-2xl mb-2">💬</span>
-                  <h2 className="card-title text-lg font-medium text-primary">
+                  <h2 className="card-title text-lg font-medium text-coffee">
                     Chat History
                   </h2>
                   <p className="text-base-content/50 text-sm font-light">
