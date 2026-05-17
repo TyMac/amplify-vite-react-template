@@ -169,7 +169,7 @@ function HomePage() {
             <div className="w-full max-w-md flex flex-col gap-5">
               <Link
                 to="/journal"
-                className="card bg-coffee text-white shadow-xl hover:shadow-2xl transition-all hover:-translate-y-0.5"
+                className="card bg-coffee text-white shadow-xl hover:shadow-2xl transition-shadow"
               >
                 <div className="card-body items-center text-center py-8">
                   <span className="text-3xl mb-2">📓</span>
@@ -184,7 +184,7 @@ function HomePage() {
 
               <Link
                 to="/chat"
-                className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+                className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-shadow"
               >
                 <div className="card-body items-center text-center py-6">
                   <span className="text-2xl mb-2">☕</span>
@@ -197,7 +197,7 @@ function HomePage() {
 
               <Link
                 to="/chats"
-                className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+                className="card bg-base-100 border border-base-200 shadow-md hover:shadow-lg transition-shadow"
               >
                 <div className="card-body items-center text-center py-6">
                   <span className="text-2xl mb-2">💬</span>
