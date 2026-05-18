@@ -16,7 +16,14 @@ const RAG_LOCATION = process.env.RAG_LOCATION || 'us-south1';
 const RAG_CORPUS = process.env.RAG_CORPUS || 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904';
 const CHAT_MODEL_PROVIDER = process.env.CHAT_MODEL_PROVIDER || 'gemini';
 const VISION_MODEL_PROVIDER = process.env.VISION_MODEL_PROVIDER || 'gemini';
+const EXTRACTION_MODEL_PROVIDER = process.env.EXTRACTION_MODEL_PROVIDER || 'gemini';
 const GEMMA4_MAAS_MODEL = process.env.GEMMA4_MAAS_MODEL || 'google/gemma-4-26b-a4b-it-maas';
+const OPENAI_COMPAT_CHAT_URL = process.env.OPENAI_COMPAT_CHAT_URL || '';
+const OPENAI_COMPAT_API_KEY = process.env.OPENAI_COMPAT_API_KEY || process.env.OPENAI_API_KEY || '';
+const OPENAI_COMPAT_CHAT_MODEL = process.env.OPENAI_COMPAT_CHAT_MODEL || process.env.OPENAI_COMPAT_MODEL || GEMMA4_MAAS_MODEL;
+const OPENAI_COMPAT_VISION_MODEL = process.env.OPENAI_COMPAT_VISION_MODEL || process.env.OPENAI_COMPAT_MODEL || OPENAI_COMPAT_CHAT_MODEL;
+const OPENAI_COMPAT_PROVIDER_LABEL = process.env.OPENAI_COMPAT_PROVIDER_LABEL || 'openai-compatible';
+const RAG_ENABLED = process.env.RAG_ENABLED !== 'false';
 const GEMMA4_CHAT_TIMEOUT_MS = Number(process.env.GEMMA4_CHAT_TIMEOUT_MS || 8000);
 const GEMMA4_VISION_TIMEOUT_MS = Number(process.env.GEMMA4_VISION_TIMEOUT_MS || 20000);
 const AI_USAGE_LIMIT_TABLE_NAME = process.env.AI_USAGE_LIMIT_TABLE_NAME;
@@ -90,20 +97,72 @@ async function callVertexAI(endpoint: string, payload: any, location?: string): 
   return response.data;
 }
 
+function isOpenAICompatibleProvider(provider: string): boolean {
+  return ['gemma4', 'openai-compatible', 'ollama', 'custom-openai'].includes(provider);
+}
+
+function resolveOpenAICompatibleProviderLabel(requestedProvider: string): string {
+  if (!OPENAI_COMPAT_CHAT_URL && requestedProvider === 'gemma4') return 'gemma4';
+  return OPENAI_COMPAT_PROVIDER_LABEL || requestedProvider;
+}
+
+function openAICompatibleUrl(): string {
+  return OPENAI_COMPAT_CHAT_URL.trim();
+}
+
 /**
- * Call Vertex AI's OpenAI-compatible endpoint (used by Gemma 4 MaaS).
+ * Call an OpenAI-compatible chat completions endpoint.
+ *
+ * By default this preserves the existing Gemma 4 MaaS route through Vertex AI.
+ * Set OPENAI_COMPAT_CHAT_URL to a full /chat/completions URL to route the same
+ * payload shape to an external OpenAI-compatible endpoint such as Ollama,
+ * Cloudflare, or an on-prem gateway. OPENAI_COMPAT_API_KEY is optional.
  */
-async function callVertexOpenAI(payload: any): Promise<any> {
-  const client = await getGCPClient();
-  const url = `https://aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${VERTEX_OPENAI_LOCATION}/endpoints/openapi/chat/completions`;
+async function callOpenAICompatible(payload: any): Promise<any> {
+  const customUrl = openAICompatibleUrl();
+  if (!customUrl) {
+    const client = await getGCPClient();
+    const url = `https://aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${VERTEX_OPENAI_LOCATION}/endpoints/openapi/chat/completions`;
 
-  const response = await client.request({
-    url,
+    const response = await client.request({
+      url,
+      method: 'POST',
+      data: payload,
+    } as any);
+
+    return response.data;
+  }
+
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+  };
+  if (OPENAI_COMPAT_API_KEY) {
+    headers.authorization = `Bearer ${OPENAI_COMPAT_API_KEY}`;
+  }
+
+  const response = await fetch(customUrl, {
     method: 'POST',
-    data: payload,
-  } as any);
+    headers,
+    body: JSON.stringify(payload),
+  });
 
-  return response.data;
+  const responseText = await response.text();
+  let data: any = null;
+  if (responseText) {
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      data = { raw: responseText };
+    }
+  }
+
+  if (!response.ok) {
+    const error: any = new Error(`OpenAI-compatible endpoint returned HTTP ${response.status}`);
+    error.response = { status: response.status, data };
+    throw error;
+  }
+
+  return data;
 }
 
 class AnonymousDailyLimitError extends Error {
@@ -226,6 +285,11 @@ function extractOpenAIText(result: any): string {
  * Manual retrieval + prompt injection lets Gemini use its full knowledge supplemented by RAG.
  */
 async function queryRAG(userMessage: string): Promise<string> {
+  if (!RAG_ENABLED) {
+    console.log('RAG disabled by RAG_ENABLED=false');
+    return '';
+  }
+
   try {
     const client = await getGCPClient();
     const url = `https://${RAG_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${GCP_PROJECT_ID}/locations/${RAG_LOCATION}:retrieveContexts`;
@@ -377,10 +441,10 @@ Use the above data in your response. Now follow the general instructions below.
     };
   };
 
-  const callGemma4Chat = async () => {
-    console.log(`Using chat model: ${GEMMA4_MAAS_MODEL}`);
-    const result = await callVertexOpenAI({
-      model: GEMMA4_MAAS_MODEL,
+  const callOpenAICompatibleChat = async () => {
+    console.log(`Using OpenAI-compatible chat model: ${OPENAI_COMPAT_CHAT_MODEL}`);
+    const result = await callOpenAICompatible({
+      model: OPENAI_COMPAT_CHAT_MODEL,
       stream: false,
       max_tokens: maxOutputTokens,
       messages: [
@@ -399,28 +463,28 @@ Use the above data in your response. Now follow the general instructions below.
     return {
       response: extractOpenAIText(result) || 'No response generated',
       tokensUsed: result.usage?.total_tokens || 0,
-      modelUsed: GEMMA4_MAAS_MODEL,
-      providerUsed: 'gemma4',
+      modelUsed: OPENAI_COMPAT_CHAT_MODEL,
+      providerUsed: resolveOpenAICompatibleProviderLabel(requestedProvider),
     };
   };
 
   console.info('Chat model selection started', {
     requestedProvider,
-    gemmaModel: GEMMA4_MAAS_MODEL,
-    openAiLocation: VERTEX_OPENAI_LOCATION,
+    openAiModel: OPENAI_COMPAT_CHAT_MODEL,
+    openAiEndpoint: openAICompatibleUrl() || `vertex:${VERTEX_OPENAI_LOCATION}`,
     messageCount: messages.length,
     latestUserMessageLength: latestUserMessage.length,
     ragContextLength: ragContext.length,
     maxOutputTokens,
   });
 
-  if (requestedProvider === 'gemma4') {
+  if (isOpenAICompatibleProvider(requestedProvider)) {
     try {
       const gemmaStart = Date.now();
       const gemmaResult = await withTimeout(
-        callGemma4Chat(),
+        callOpenAICompatibleChat(),
         GEMMA4_CHAT_TIMEOUT_MS,
-        'gemma4_chat'
+        `${requestedProvider}_chat`
       );
       const gemmaLatencyMs = Date.now() - gemmaStart;
 
@@ -445,9 +509,9 @@ Use the above data in your response. Now follow the general instructions below.
         return JSON.stringify(response);
       }
 
-      console.warn('Gemma 4 chat returned empty response; falling back to Gemini Flash Lite', {
+      console.warn('OpenAI-compatible chat returned empty response; falling back to Gemini Flash Lite', {
         requestedProvider,
-        gemmaModel: GEMMA4_MAAS_MODEL,
+        openAiModel: OPENAI_COMPAT_CHAT_MODEL,
         gemmaLatencyMs,
       });
       const geminiStart = Date.now();
@@ -456,7 +520,7 @@ Use the above data in your response. Now follow the general instructions below.
         ...geminiResult,
         requestedProvider,
         fallbackUsed: true,
-        fallbackReason: 'gemma_empty_response',
+        fallbackReason: `${requestedProvider}_empty_response`,
         latencyMs: Date.now() - startedAt,
         providerLatencyMs: Date.now() - geminiStart,
       };
@@ -472,10 +536,10 @@ Use the above data in your response. Now follow the general instructions below.
       });
       return JSON.stringify(response);
     } catch (error: any) {
-      const fallbackReason = `gemma_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
-      console.error('Gemma 4 chat failed; falling back to Gemini Flash Lite', {
+      const fallbackReason = `${requestedProvider}_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
+      console.error('OpenAI-compatible chat failed; falling back to Gemini Flash Lite', {
         requestedProvider,
-        gemmaModel: GEMMA4_MAAS_MODEL,
+        openAiModel: OPENAI_COMPAT_CHAT_MODEL,
         fallbackReason,
         errorMessage: error?.message,
         errorStatus: error?.response?.status,
@@ -578,9 +642,9 @@ async function analyzeImageWithGeminiFlash(imageBase64: string, prompt: string) 
 /**
  * Analyze image with Gemma 4 MaaS via Vertex AI's OpenAI-compatible endpoint.
  */
-async function analyzeImageWithGemma4(imageBase64: string, prompt: string) {
-  const result = await callVertexOpenAI({
-    model: GEMMA4_MAAS_MODEL,
+async function analyzeImageWithOpenAICompatible(imageBase64: string, prompt: string, requestedProvider: string) {
+  const result = await callOpenAICompatible({
+    model: OPENAI_COMPAT_VISION_MODEL,
     stream: false,
     max_tokens: 512,
     messages: [
@@ -605,13 +669,13 @@ async function analyzeImageWithGemma4(imageBase64: string, prompt: string) {
   return {
     analysis: extractOpenAIText(result) || 'Could not analyze image',
     tokensUsed: result.usage?.total_tokens || 0,
-    modelUsed: GEMMA4_MAAS_MODEL,
-    providerUsed: 'gemma4',
+    modelUsed: OPENAI_COMPAT_VISION_MODEL,
+    providerUsed: resolveOpenAICompatibleProviderLabel(requestedProvider),
   };
 }
 
 /**
- * Analyze image with the configured vision provider. Gemma 4 is experimental, so
+ * Analyze image with the configured vision provider. OpenAI-compatible vision is experimental, so
  * fall back to Gemini Flash if Gemma errors or returns an empty response.
  */
 async function geminiVision(args: { imageBase64: string; prompt?: string }) {
@@ -621,19 +685,19 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
 
   console.info('Vision model selection started', {
     requestedProvider,
-    gemmaModel: GEMMA4_MAAS_MODEL,
-    openAiLocation: VERTEX_OPENAI_LOCATION,
+    openAiModel: OPENAI_COMPAT_VISION_MODEL,
+    openAiEndpoint: openAICompatibleUrl() || `vertex:${VERTEX_OPENAI_LOCATION}`,
     promptLength: prompt.length,
     imageBase64Length: imageBase64.length,
   });
 
-  if (requestedProvider === 'gemma4') {
+  if (isOpenAICompatibleProvider(requestedProvider)) {
     try {
       const gemmaStart = Date.now();
       const gemmaResult = await withTimeout(
-        analyzeImageWithGemma4(imageBase64, prompt),
+        analyzeImageWithOpenAICompatible(imageBase64, prompt, requestedProvider),
         GEMMA4_VISION_TIMEOUT_MS,
-        'gemma4_vision'
+        `${requestedProvider}_vision`
       );
       const gemmaLatencyMs = Date.now() - gemmaStart;
 
@@ -658,9 +722,9 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
         return JSON.stringify(response);
       }
 
-      console.warn('Gemma 4 vision returned empty analysis; falling back to Gemini Flash', {
+      console.warn('OpenAI-compatible vision returned empty analysis; falling back to Gemini Flash', {
         requestedProvider,
-        gemmaModel: GEMMA4_MAAS_MODEL,
+        openAiModel: OPENAI_COMPAT_VISION_MODEL,
         gemmaLatencyMs,
       });
       const geminiStart = Date.now();
@@ -669,7 +733,7 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
         ...geminiResult,
         requestedProvider,
         fallbackUsed: true,
-        fallbackReason: 'gemma_empty_response',
+        fallbackReason: `${requestedProvider}_empty_response`,
         latencyMs: Date.now() - startedAt,
         providerLatencyMs: Date.now() - geminiStart,
       };
@@ -685,10 +749,10 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
       });
       return JSON.stringify(response);
     } catch (error: any) {
-      const fallbackReason = `gemma_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
-      console.error('Gemma 4 vision failed; falling back to Gemini Flash', {
+      const fallbackReason = `${requestedProvider}_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
+      console.error('OpenAI-compatible vision failed; falling back to Gemini Flash', {
         requestedProvider,
-        gemmaModel: GEMMA4_MAAS_MODEL,
+        openAiModel: OPENAI_COMPAT_VISION_MODEL,
         fallbackReason,
         errorMessage: error?.message,
         errorStatus: error?.response?.status,
@@ -793,23 +857,39 @@ Important: If the conversation includes a system message with "Chat tags with se
 Return ONLY the JSON object, no markdown, no explanation.`;
 
   const model = 'gemini-2.0-flash-lite-001';
-
-  const payload = {
-    contents: [
-      {
-        role: 'user',
-        parts: [{ text: extractionPrompt }],
-      },
-    ],
-    generationConfig: {
-      temperature: 0.2, // Lower temperature for more consistent JSON output
-      maxOutputTokens: 1024,
-    },
-  };
+  const requestedProvider = EXTRACTION_MODEL_PROVIDER;
 
   try {
-    const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
-    const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    let responseText = '{}';
+    let tokensUsed = 0;
+
+    if (isOpenAICompatibleProvider(requestedProvider)) {
+      const result = await callOpenAICompatible({
+        model: OPENAI_COMPAT_CHAT_MODEL,
+        stream: false,
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: extractionPrompt }],
+        temperature: 0.2,
+      });
+      responseText = extractOpenAIText(result) || '{}';
+      tokensUsed = result.usage?.total_tokens || 0;
+    } else {
+      const payload = {
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: extractionPrompt }],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.2, // Lower temperature for more consistent JSON output
+          maxOutputTokens: 1024,
+        },
+      };
+      const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
+      responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+      tokensUsed = result.usageMetadata?.totalTokenCount || 0;
+    }
 
     // Try to parse the JSON response
     try {
@@ -829,7 +909,7 @@ Return ONLY the JSON object, no markdown, no explanation.`;
       return JSON.stringify({
         success: true,
         fields: parsed,
-        tokensUsed: result.usageMetadata?.totalTokenCount || 0,
+        tokensUsed,
       });
     } catch (parseError) {
       console.error('Failed to parse extraction response:', responseText);
@@ -863,7 +943,7 @@ Return ONLY the JSON object, no markdown, no explanation.`;
           savory: null,
           confidence: 'low',
         },
-        tokensUsed: result.usageMetadata?.totalTokenCount || 0,
+        tokensUsed,
       });
     }
   } catch (error: any) {

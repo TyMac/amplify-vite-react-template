@@ -1,8 +1,8 @@
 # Barista AI model routing, fallback, and attribution
 
-Last updated: 2026-05-10
+Last updated: 2026-05-17
 
-This document explains how Barista routes chat/vision requests across Gemma 4 and Gemini, how fallback works, and how the UI shows which model produced each assistant response.
+This document explains how Barista routes chat/vision requests across OpenAI-compatible endpoints, Gemma 4 on Vertex AI, and Gemini, how fallback works, and how the UI shows which model produced each assistant response.
 
 ## Backend entry points
 
@@ -21,15 +21,15 @@ Current AI query entry points:
   - recipe generation
   - anonymous daily quota enforcement
   - RAG retrieval/injection
-  - Gemma 4 first if `CHAT_MODEL_PROVIDER=gemma4`
+  - OpenAI-compatible route first if `CHAT_MODEL_PROVIDER=gemma4`, `openai-compatible`, `ollama`, or `custom-openai`
   - Gemini Flash Lite fallback
 - `geminiVision`
   - image analysis
-  - Gemma 4 first if `VISION_MODEL_PROVIDER=gemma4`
+  - OpenAI-compatible route first if `VISION_MODEL_PROVIDER=gemma4`, `openai-compatible`, `ollama`, or `custom-openai`
   - Gemini Flash fallback
 - `extractJournalFields`
   - structured extraction from chat/journal context
-  - Gemini Flash Lite
+  - Gemini Flash Lite by default, or OpenAI-compatible route when `EXTRACTION_MODEL_PROVIDER` is set to an OpenAI-compatible provider
 
 ## Important environment variables
 
@@ -37,25 +37,33 @@ Configured in `amplify/function/gemini-api/resource.ts` and deployed into the La
 
 | Variable | Purpose |
 | --- | --- |
-| `CHAT_MODEL_PROVIDER` | Set to `gemma4` to try Gemma 4 first for chat. Otherwise uses Gemini directly. |
-| `VISION_MODEL_PROVIDER` | Set to `gemma4` to try Gemma 4 first for image analysis. Otherwise uses Gemini directly. |
-| `GEMMA4_MAAS_MODEL` | Gemma 4 MaaS model name, currently `google/gemma-4-26b-a4b-it-maas`. |
-| `GEMMA4_CHAT_TIMEOUT_MS` | Max time to wait for Gemma 4 chat before fallback. Currently 8000 ms. |
-| `GEMMA4_VISION_TIMEOUT_MS` | Max time to wait for Gemma 4 vision before fallback. Currently 20000 ms. |
+| `CHAT_MODEL_PROVIDER` | Set to `gemma4`, `openai-compatible`, `ollama`, or `custom-openai` to use the OpenAI-compatible route first for chat. Otherwise uses Gemini directly. |
+| `VISION_MODEL_PROVIDER` | Set to `gemma4`, `openai-compatible`, `ollama`, or `custom-openai` to use the OpenAI-compatible route first for image analysis. Otherwise uses Gemini directly. |
+| `EXTRACTION_MODEL_PROVIDER` | Provider for `extractJournalFields`; defaults to `gemini` to preserve the existing structured-extraction behavior. |
+| `OPENAI_COMPAT_CHAT_URL` | Full `/chat/completions` URL for an OpenAI-compatible endpoint. Blank means use Vertex AI's OpenAI-compatible Gemma MaaS endpoint. |
+| `OPENAI_COMPAT_MODEL` | Default model name for external OpenAI-compatible chat/vision/extraction requests. |
+| `OPENAI_COMPAT_CHAT_MODEL` | Optional chat/extraction-specific model override. Defaults to `OPENAI_COMPAT_MODEL`, then `GEMMA4_MAAS_MODEL`. |
+| `OPENAI_COMPAT_VISION_MODEL` | Optional vision-specific model override. Defaults to `OPENAI_COMPAT_MODEL`, then chat model. |
+| `OPENAI_COMPAT_PROVIDER_LABEL` | Metadata label returned to the UI for custom OpenAI-compatible endpoints; defaults to `openai-compatible`, configured as `gemma4` for current Vertex route. |
+| `OPENAI_COMPAT_API_KEY` / `OPENAI_API_KEY` | Optional bearer token for external OpenAI-compatible endpoints. Do not commit real values; set via Lambda/Amplify environment or secrets. |
+| `GEMMA4_MAAS_MODEL` | Backward-compatible Gemma 4 MaaS model default, currently `google/gemma-4-26b-a4b-it-maas`. |
+| `GEMMA4_CHAT_TIMEOUT_MS` | Max time to wait for OpenAI-compatible chat before fallback. Currently 8000 ms. |
+| `GEMMA4_VISION_TIMEOUT_MS` | Max time to wait for OpenAI-compatible vision before fallback. Currently 20000 ms. |
 | `VERTEX_LOCATION` | Gemini/RAG location, currently `us-south1`. Do not change casually because the RAG corpus lives there. |
-| `VERTEX_OPENAI_LOCATION` | Vertex OpenAI-compatible endpoint location for Gemma MaaS, currently `global`. |
+| `VERTEX_OPENAI_LOCATION` | Vertex OpenAI-compatible endpoint location for Gemma MaaS, currently `global`; only used when `OPENAI_COMPAT_CHAT_URL` is blank. |
+| `RAG_ENABLED` | Set to `false` to skip Vertex RAG retrieval, useful when routing fully away from GCP. |
 | `RAG_LOCATION` | RAG retrieval location, currently `us-south1`. |
 | `RAG_CORPUS` | Full Vertex RAG corpus resource path. |
 
-## Gemma 4 chat route
+## OpenAI-compatible chat route
 
-`geminiChat()` builds the prompt, retrieves RAG context, then logs model selection:
+`geminiChat()` builds the prompt, optionally retrieves RAG context, then logs model selection:
 
 ```ts
 console.info('Chat model selection started', {
   requestedProvider,
-  gemmaModel: GEMMA4_MAAS_MODEL,
-  openAiLocation: VERTEX_OPENAI_LOCATION,
+  openAiModel: OPENAI_COMPAT_CHAT_MODEL,
+  openAiEndpoint: openAICompatibleUrl() || `vertex:${VERTEX_OPENAI_LOCATION}`,
   messageCount: messages.length,
   latestUserMessageLength: latestUserMessage.length,
   ragContextLength: ragContext.length,
@@ -63,17 +71,28 @@ console.info('Chat model selection started', {
 });
 ```
 
-If `CHAT_MODEL_PROVIDER === 'gemma4'`, the Lambda calls Vertex AI's OpenAI-compatible endpoint:
+If `CHAT_MODEL_PROVIDER` is `gemma4`, `openai-compatible`, `ollama`, or `custom-openai`, the Lambda sends an OpenAI-compatible `/chat/completions` payload.
+
+Default behavior, with `OPENAI_COMPAT_CHAT_URL` blank, preserves the current Vertex AI Gemma MaaS endpoint:
 
 ```ts
 https://aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${VERTEX_OPENAI_LOCATION}/endpoints/openapi/chat/completions
+```
+
+To route elsewhere, set `OPENAI_COMPAT_CHAT_URL` to the target endpoint, for example:
+
+```bash
+OPENAI_COMPAT_CHAT_URL=https://your-gateway.example.com/v1/chat/completions
+OPENAI_COMPAT_MODEL=llama3.1:8b
+OPENAI_COMPAT_PROVIDER_LABEL=ollama
+RAG_ENABLED=false  # optional, skips Vertex RAG when moving fully off GCP
 ```
 
 Payload essentials:
 
 ```ts
 {
-  model: GEMMA4_MAAS_MODEL,
+  model: OPENAI_COMPAT_CHAT_MODEL,
   stream: false,
   max_tokens: maxOutputTokens,
   messages: [...],
@@ -85,7 +104,7 @@ Payload essentials:
 }
 ```
 
-`enable_thinking: false` is intentional. Previous testing showed thinking mode and large outputs made Gemma 4 too slow for Barista's interactive chat path.
+`enable_thinking: false` is intentional for the current Gemma 4 route. OpenAI-compatible servers that ignore unknown fields should work unchanged; if a target rejects unknown fields, remove or gate this field for that provider.
 
 ## Chat max output tokens
 
@@ -117,13 +136,13 @@ Reason:
 
 ## Chat fallback behavior
 
-Gemma 4 chat is wrapped in:
+OpenAI-compatible chat is wrapped in:
 
 ```ts
-withTimeout(callGemma4Chat(), GEMMA4_CHAT_TIMEOUT_MS, 'gemma4_chat')
+withTimeout(callOpenAICompatibleChat(), GEMMA4_CHAT_TIMEOUT_MS, `${requestedProvider}_chat`)
 ```
 
-If Gemma 4 succeeds and returns non-empty text, the response metadata is:
+If the OpenAI-compatible call succeeds and returns non-empty text, the response metadata is:
 
 ```json
 {
@@ -135,7 +154,7 @@ If Gemma 4 succeeds and returns non-empty text, the response metadata is:
 }
 ```
 
-If Gemma 4 times out, returns empty text, or throws, the Lambda falls back to Gemini Flash Lite:
+If the OpenAI-compatible call times out, returns empty text, or throws, the Lambda falls back to Gemini Flash Lite:
 
 - fallback model: `gemini-2.0-flash-lite-001`
 - fallback reason examples:
@@ -188,7 +207,7 @@ Vision response metadata includes:
 
 ## RAG interaction and latency
 
-`geminiChat()` always retrieves RAG context from the latest user message and injects it before the base system prompt.
+`geminiChat()` retrieves RAG context from the latest user message and injects it before the base system prompt unless `RAG_ENABLED=false`.
 
 Important latency implication:
 
@@ -294,4 +313,5 @@ npm run build
 - Do not lower recipe generation tokens without testing full JSON parsing.
 - Do not move `VERTEX_LOCATION` away from `us-south1` unless the RAG corpus also moves.
 - Do not call Gemma MaaS through the normal Gemini publisher endpoint; Gemma MaaS uses the OpenAI-compatible endpoint.
+- For external Ollama/Cloudflare/on-prem endpoints, set `OPENAI_COMPAT_CHAT_URL` to the full `/chat/completions` URL and keep API keys out of committed code.
 - If logs show `gemma4_chat_timeout_8000ms`, Gemma was selected and called. The failure was latency, not model selection.
