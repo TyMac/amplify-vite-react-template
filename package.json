@@ -10,9 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@aws-amplify/ui-react": "~6.13.2",
+    "@aws-amplify/ui-react": "~6.15.4",
     "@aws-sdk/client-dynamodb": "^3.1045.0",
-    "aws-amplify": "~6.15.10",
+    "aws-amplify": "~6.17.0",
     "google-auth-library": "^10.5.0",
     "react": "~18.3.1",
     "react-dom": "~18.3.1",
@@ -27,8 +27,8 @@
     "npm": ">= 10.8.0"
   },
   "devDependencies": {
-    "@aws-amplify/backend": "~1.19.0",
-    "@aws-amplify/backend-cli": "~1.8.1",
+    "@aws-amplify/backend": "~1.22.0",
+    "@aws-amplify/backend-cli": "~1.8.2",
     "@eslint/compat": "~2.0.1",
     "@eslint/eslintrc": "~3.3.3",
     "@eslint/js": "~9.39.2",
@@ -49,6 +49,6 @@
     "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
     "typescript": "~5.9.3",
-    "vite": "~7.3.1"
+    "vite": "~7.3.3"
   }
 }
