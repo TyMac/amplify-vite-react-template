@@ -1,6 +1,6 @@
 /**
  * Gemini AI Service — Web App
- * Calls geminiChat via AppSync (same Lambda as mobile)
+ * Calls gemmaChat via AppSync (same Lambda as mobile)
  */
 
 import { generateClient } from "aws-amplify/data";
@@ -201,7 +201,7 @@ export async function chatWithGeminiResult(
     const messagesJson = messages.map((msg) => JSON.stringify(msg));
     const { authMode, deviceId } = await getAiRequestAuth();
 
-    const result = await getClient(authMode).queries.geminiChat({
+    const result = await getClient(authMode).queries.gemmaChat({
       messages: messagesJson,
       systemPrompt: systemPrompt || BARISTA_SYSTEM_PROMPT,
       deviceId,

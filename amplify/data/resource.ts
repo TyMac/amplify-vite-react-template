@@ -384,7 +384,7 @@ const schema = a.schema({
   // ============================================
   // GEMINI AI - Custom queries via Lambda
   // ============================================
-  geminiChat: a
+  gemmaChat: a
     .query()
     .arguments({
       messages: a.string().array().required(), // JSON stringified messages

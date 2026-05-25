@@ -16,7 +16,7 @@ The Lambda handler is defined in:
 
 Current AI query entry points:
 
-- `geminiChat`
+- `gemmaChat`
   - normal chat
   - recipe generation
   - anonymous daily quota enforcement
@@ -57,7 +57,7 @@ Configured in `amplify/function/gemini-api/resource.ts` and deployed into the La
 
 ## OpenAI-compatible chat route
 
-`geminiChat()` builds the prompt, optionally retrieves RAG context, then logs model selection:
+`gemmaChat()` builds the prompt, optionally retrieves RAG context, then logs model selection:
 
 ```ts
 console.info('Chat model selection started', {
@@ -207,7 +207,7 @@ Vision response metadata includes:
 
 ## RAG interaction and latency
 
-`geminiChat()` retrieves RAG context from the latest user message and injects it before the base system prompt unless `RAG_ENABLED=false`.
+`gemmaChat()` retrieves RAG context from the latest user message and injects it before the base system prompt unless `RAG_ENABLED=false`.
 
 Important latency implication:
 

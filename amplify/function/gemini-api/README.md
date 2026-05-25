@@ -53,7 +53,7 @@ Already configured in `backend.ts`.
 
 ```graphql
 query GeminiChat {
-  geminiChat(
+  gemmaChat(
     messages: [
       "{\"role\":\"user\",\"content\":\"I have Ethiopian beans, light roast. How should I brew them?\"}",
       "{\"role\":\"assistant\",\"content\":\"Great choice! Ethiopian light roasts...\"}",

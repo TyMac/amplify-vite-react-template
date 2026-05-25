@@ -347,8 +347,8 @@ export async function handler(event: any) {
 
   try {
     switch (fieldName) {
-      case 'geminiChat':
-        return await geminiChat(args, event);
+      case 'gemmaChat':
+        return await gemmaChat(args, event);
       case 'geminiVision':
         return await geminiVision(args);
       case 'extractJournalFields':
@@ -368,7 +368,7 @@ export async function handler(event: any) {
 /**
  * Chat with Gemini Flash
  */
-async function geminiChat(args: { messages: string[]; systemPrompt?: string; deviceId?: string; maxOutputTokens?: number }, event: any) {
+async function gemmaChat(args: { messages: string[]; systemPrompt?: string; deviceId?: string; maxOutputTokens?: number }, event: any) {
   await enforceAnonymousDailyChatLimit(args, event);
 
   const { messages: messagesJson, systemPrompt } = args;
