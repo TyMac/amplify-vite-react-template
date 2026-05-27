@@ -802,7 +802,7 @@ export default function JournalPage() {
 
       {calendarModalOpen && (
         <div className="modal modal-open" role="dialog" aria-modal="true">
-          <div className="modal-box max-w-3xl w-11/12 p-0 overflow-hidden">
+          <div className="modal-box flex h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-none flex-col overflow-hidden p-0 sm:h-[92dvh] sm:max-h-[92dvh] sm:w-[94vw]">
             <div className="flex items-center justify-between px-5 py-4 border-b border-base-200">
               <div>
                 <h2 className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Calendar</h2>
@@ -818,7 +818,7 @@ export default function JournalPage() {
                 ✕
               </button>
             </div>
-            <div className="p-5">
+            <div className="flex-1 min-h-0 p-3 sm:p-5">
               <JournalCalendar
                 size="large"
                 brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}

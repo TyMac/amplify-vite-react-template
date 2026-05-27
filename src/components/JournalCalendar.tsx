@@ -82,9 +82,9 @@ export default function JournalCalendar({
   }
 
   return (
-    <div className="card bg-base-100 shadow-sm border border-base-200">
-      <div className={`card-body ${isLarge ? "p-6" : "p-4"}`}>
-        <div className={`flex items-center justify-between ${isLarge ? "mb-6" : "mb-4"}`}>
+    <div className={`card bg-base-100 shadow-sm border border-base-200 ${isLarge ? "h-full" : ""}`}>
+      <div className={`card-body ${isLarge ? "p-4 sm:p-6 h-full min-h-0 flex flex-col" : "p-4"}`}>
+        <div className={`flex items-center justify-between ${isLarge ? "mb-4 sm:mb-6 flex-shrink-0" : "mb-4"}`}>
           <button onClick={goToPreviousMonth} className={`btn btn-ghost ${isLarge ? "btn-md" : "btn-sm"}`}>
             ←
           </button>
@@ -96,18 +96,18 @@ export default function JournalCalendar({
           </button>
         </div>
 
-        <div className={`grid grid-cols-7 gap-1 text-center font-medium text-base-content/50 mb-2 ${isLarge ? "text-sm" : "text-xs"}`}>
+        <div className={`grid grid-cols-7 gap-1 text-center font-medium text-base-content/50 mb-2 ${isLarge ? "text-sm flex-shrink-0" : "text-xs"}`}>
           {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
             <div key={d}>{d}</div>
           ))}
         </div>
 
-        <div className="flex flex-col gap-1">
+        <div className={`${isLarge ? "flex flex-1 min-h-0 flex-col gap-2" : "flex flex-col gap-1"}`}>
           {weeks.map((week, weekIdx) => (
-            <div key={weekIdx} className="grid grid-cols-7 gap-1">
+            <div key={weekIdx} className={`grid grid-cols-7 ${isLarge ? "flex-1 min-h-0 gap-2" : "gap-1"}`}>
               {week.map((day, dayIdx) => {
                 if (day === null) {
-                  return <div key={dayIdx} className="h-10" />;
+                  return <div key={dayIdx} className={isLarge ? "min-h-20 h-full" : "h-10"} />;
                 }
 
                 const dateKey = formatDateKey(year, month, day);
@@ -123,7 +123,7 @@ export default function JournalCalendar({
                     type="button"
                     onClick={() => handleDayClick(day)}
                     disabled={!hasEntry}
-                    className={`${isLarge ? "h-16" : "h-10"} flex flex-col items-center justify-center rounded-lg transition-colors ${
+                    className={`${isLarge ? "min-h-20 h-full" : "h-10"} flex flex-col items-center justify-center rounded-lg transition-colors ${
                       isSelected
                         ? "ring-2 ring-primary bg-primary/10"
                         : hasEntry
