@@ -92,6 +92,16 @@ export default function JournalPage() {
     return formatDateKey(selectedEntry.brewDate, timezone);
   }, [selectedEntry, timezone]);
 
+  const entryColorsByDate = useMemo(() => {
+    return entries.reduce<Record<string, string[]>>((colorsByDate, entry) => {
+      if (!entry.brewDate) return colorsByDate;
+      const dateKey = formatDateKey(entry.brewDate, timezone);
+      const color = entry.coffeeBatchId ? batchColor(entry.coffeeBatchId) : "#6b7280";
+      colorsByDate[dateKey] = [...(colorsByDate[dateKey] ?? []), color];
+      return colorsByDate;
+    }, {});
+  }, [entries, timezone]);
+
   useEffect(() => {
     loadAll();
   }, [user]);
@@ -777,6 +787,7 @@ export default function JournalPage() {
                 <div className="px-3 pb-3">
                   <JournalCalendar
                     brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
+                    entryColorsByDate={entryColorsByDate}
                     selectedDate={selectedDateKey}
                     onSelectDate={(dateKey) => {
                       if (dateKey) handleDateClick(dateKey);
@@ -811,6 +822,7 @@ export default function JournalPage() {
               <JournalCalendar
                 size="large"
                 brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
+                entryColorsByDate={entryColorsByDate}
                 selectedDate={selectedDateKey}
                 onSelectDate={(dateKey) => {
                   if (dateKey) {

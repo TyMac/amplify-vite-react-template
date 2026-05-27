@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 
 interface JournalCalendarProps {
   brewDates: string[];
+  entryColorsByDate?: Record<string, string[]>;
   selectedDate: string | null;
   onSelectDate: (date: string | null) => void;
   size?: "default" | "large";
@@ -21,6 +22,7 @@ function formatDateKey(year: number, month: number, day: number): string {
 
 export default function JournalCalendar({
   brewDates,
+  entryColorsByDate = {},
   selectedDate,
   onSelectDate,
   size = "default",
@@ -30,13 +32,13 @@ export default function JournalCalendar({
   const month = currentDate.getMonth();
 
   const brewDateSet = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set<string>(Object.keys(entryColorsByDate));
     brewDates.forEach((dateStr) => {
       const d = new Date(dateStr);
       set.add(formatDateKey(d.getFullYear(), d.getMonth(), d.getDate()));
     });
     return set;
-  }, [brewDates]);
+  }, [brewDates, entryColorsByDate]);
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDayOfMonth = getFirstDayOfMonth(year, month);
@@ -110,6 +112,9 @@ export default function JournalCalendar({
 
                 const dateKey = formatDateKey(year, month, day);
                 const hasEntry = brewDateSet.has(dateKey);
+                const entryColors = entryColorsByDate[dateKey] ?? [];
+                const visibleEntryColors = entryColors.slice(0, 4);
+                const hiddenEntryColorCount = Math.max(entryColors.length - visibleEntryColors.length, 0);
                 const isSelected = selectedDate === dateKey;
 
                 return (
@@ -128,6 +133,20 @@ export default function JournalCalendar({
                   >
                     <span className={isLarge ? "text-base" : "text-sm"}>{day}</span>
                     {hasEntry && <span className={`${isLarge ? "text-xs" : "text-[10px]"} leading-none`}>☕</span>}
+                    {entryColors.length > 0 && (
+                      <div className="flex max-w-full flex-wrap justify-center gap-0.5 mt-0.5" aria-hidden="true">
+                        {visibleEntryColors.map((color, colorIdx) => (
+                          <span
+                            key={`${dateKey}-${color}-${colorIdx}`}
+                            className={`${isLarge ? "h-2 w-2" : "h-1.5 w-1.5"} rounded-full border border-base-100 shadow-sm`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                        {hiddenEntryColorCount > 0 && (
+                          <span className="text-[9px] leading-none text-base-content/45">+{hiddenEntryColorCount}</span>
+                        )}
+                      </div>
+                    )}
                   </button>
                 );
               })}
