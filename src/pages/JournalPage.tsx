@@ -102,6 +102,28 @@ export default function JournalPage() {
     }, {});
   }, [entries, timezone]);
 
+  const roastDatesByDate = useMemo(() => {
+    return entries.reduce<Record<string, { color: string; coffeeName: string }[]>>((markersByDate, entry) => {
+      const batch = entry.coffeeBatchId
+        ? batches.find((candidate) => candidate.id === entry.coffeeBatchId)
+        : null;
+      const roastDate = batch?.roastDate ?? entry.roastDate;
+      if (!roastDate) return markersByDate;
+
+      const dateKey = formatDateKey(`${roastDate}T00:00:00`, timezone);
+      const color = entry.coffeeBatchId ? batchColor(entry.coffeeBatchId) : "#6b7280";
+      const coffeeName = batch?.coffeeName ?? entry.coffeeName;
+      const marker = { color, coffeeName };
+
+      const existingMarkers = markersByDate[dateKey] ?? [];
+      const alreadyExists = existingMarkers.some(
+        (existingMarker) => existingMarker.coffeeName === marker.coffeeName && existingMarker.color === marker.color
+      );
+      markersByDate[dateKey] = alreadyExists ? existingMarkers : [...existingMarkers, marker];
+      return markersByDate;
+    }, {});
+  }, [batches, entries, timezone]);
+
   useEffect(() => {
     loadAll();
   }, [user]);
@@ -788,6 +810,7 @@ export default function JournalPage() {
                   <JournalCalendar
                     brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
                     entryColorsByDate={entryColorsByDate}
+                    roastDatesByDate={roastDatesByDate}
                     selectedDate={selectedDateKey}
                     onSelectDate={(dateKey) => {
                       if (dateKey) handleDateClick(dateKey);
@@ -823,6 +846,7 @@ export default function JournalPage() {
                 size="large"
                 brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
                 entryColorsByDate={entryColorsByDate}
+                roastDatesByDate={roastDatesByDate}
                 selectedDate={selectedDateKey}
                 onSelectDate={(dateKey) => {
                   if (dateKey) {

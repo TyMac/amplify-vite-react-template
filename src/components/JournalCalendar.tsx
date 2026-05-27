@@ -1,8 +1,14 @@
 import { useState, useMemo } from "react";
 
+interface RoastDateMarker {
+  color: string;
+  coffeeName: string;
+}
+
 interface JournalCalendarProps {
   brewDates: string[];
   entryColorsByDate?: Record<string, string[]>;
+  roastDatesByDate?: Record<string, RoastDateMarker[]>;
   selectedDate: string | null;
   onSelectDate: (date: string | null) => void;
   size?: "default" | "large";
@@ -23,6 +29,7 @@ function formatDateKey(year: number, month: number, day: number): string {
 export default function JournalCalendar({
   brewDates,
   entryColorsByDate = {},
+  roastDatesByDate = {},
   selectedDate,
   onSelectDate,
   size = "default",
@@ -115,6 +122,14 @@ export default function JournalCalendar({
                 const entryColors = entryColorsByDate[dateKey] ?? [];
                 const visibleEntryColors = entryColors.slice(0, 4);
                 const hiddenEntryColorCount = Math.max(entryColors.length - visibleEntryColors.length, 0);
+                const roastMarkers = roastDatesByDate[dateKey] ?? [];
+                const firstRoastMarker = roastMarkers[0];
+                const hiddenRoastMarkerCount = Math.max(roastMarkers.length - 1, 0);
+                const roastMarkerTitle = roastMarkers.length
+                  ? roastMarkers.length === 1
+                    ? `Roast date for ${firstRoastMarker.coffeeName}`
+                    : `Roast date for ${roastMarkers.length} coffees: ${roastMarkers.map((marker) => marker.coffeeName).join(", ")}`
+                  : undefined;
                 const isSelected = selectedDate === dateKey;
 
                 return (
@@ -123,16 +138,29 @@ export default function JournalCalendar({
                     type="button"
                     onClick={() => handleDayClick(day)}
                     disabled={!hasEntry}
-                    className={`${isLarge ? "min-h-20 h-full" : "h-10"} flex flex-col items-center justify-center rounded-lg transition-colors ${
+                    className={`${isLarge ? "min-h-20 h-full" : "h-10"} relative flex flex-col items-center justify-center rounded-lg transition-colors ${
                       isSelected
                         ? "ring-2 ring-primary bg-primary/10"
                         : hasEntry
                         ? "hover:bg-base-200 cursor-pointer"
+                        : roastMarkers.length > 0
+                        ? "opacity-80 cursor-default"
                         : "opacity-50 cursor-default"
                     }`}
+                    title={roastMarkerTitle}
                   >
                     <span className={isLarge ? "text-base" : "text-sm"}>{day}</span>
                     {hasEntry && <span className={`${isLarge ? "text-xs" : "text-[10px]"} leading-none`}>☕</span>}
+                    {firstRoastMarker && (
+                      <span
+                        className={`absolute right-1 top-1 inline-flex items-center rounded-full bg-base-100/85 px-0.5 leading-none shadow-sm ${isLarge ? "text-sm" : "text-[10px]"}`}
+                        style={{ color: firstRoastMarker.color }}
+                        role="img"
+                        aria-label={roastMarkerTitle}
+                      >
+                        🔥{hiddenRoastMarkerCount > 0 && <span className="ml-0.5 text-[9px] text-base-content/60">+{hiddenRoastMarkerCount}</span>}
+                      </span>
+                    )}
                     {entryColors.length > 0 && (
                       <div className="flex max-w-full flex-wrap justify-center gap-0.5 mt-0.5" aria-hidden="true">
                         {visibleEntryColors.map((color, colorIdx) => (
