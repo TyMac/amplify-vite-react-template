@@ -112,7 +112,7 @@ export default function JournalPage() {
   }, [entryMarkersByDate]);
 
   const roastDatesByDate = useMemo(() => {
-    return entries.reduce<Record<string, { color: string; coffeeName: string }[]>>((markersByDate, entry) => {
+    return entries.reduce<Record<string, { color: string; coffeeName: string; entryId: string }[]>>((markersByDate, entry) => {
       const batch = entry.coffeeBatchId
         ? batches.find((candidate) => candidate.id === entry.coffeeBatchId)
         : null;
@@ -122,7 +122,7 @@ export default function JournalPage() {
       const dateKey = formatDateKey(`${roastDate}T00:00:00`, timezone);
       const color = entry.coffeeBatchId ? batchColor(entry.coffeeBatchId) : "#6b7280";
       const coffeeName = batch?.coffeeName ?? entry.coffeeName;
-      const marker = { color, coffeeName };
+      const marker = { color, coffeeName, entryId: entry.id };
 
       const existingMarkers = markersByDate[dateKey] ?? [];
       const alreadyExists = existingMarkers.some(
@@ -822,6 +822,7 @@ export default function JournalPage() {
                     entryMarkersByDate={entryMarkersByDate}
                     roastDatesByDate={roastDatesByDate}
                     selectedDate={selectedDateKey}
+                    onSelectRoastDate={handleEntryClick}
                     onSelectDate={(dateKey) => {
                       if (dateKey) handleDateClick(dateKey);
                     }}
@@ -839,7 +840,7 @@ export default function JournalPage() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-base-200">
               <div>
                 <h2 className="text-sm font-semibold text-base-content/70 uppercase tracking-wider">Calendar</h2>
-                <p className="text-xs text-base-content/45">Click a brew date to jump to that journal entry.</p>
+                <p className="text-xs text-base-content/45">Click a brew date or roast marker to jump to that journal entry.</p>
               </div>
               <button
                 type="button"
@@ -859,9 +860,15 @@ export default function JournalPage() {
                 entryMarkersByDate={entryMarkersByDate}
                 roastDatesByDate={roastDatesByDate}
                 selectedDate={selectedDateKey}
+                onSelectRoastDate={(entryId) => {
+                  handleEntryClick(entryId);
+                  setCalendarModalOpen(false);
+                }}
                 onSelectDate={(dateKey) => {
                   if (dateKey) {
                     handleDateClick(dateKey);
+                    setCalendarModalOpen(false);
+                  } else {
                     setCalendarModalOpen(false);
                   }
                 }}

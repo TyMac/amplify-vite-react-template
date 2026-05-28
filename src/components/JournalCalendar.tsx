@@ -3,6 +3,7 @@ import { useState, useMemo } from "react";
 interface RoastDateMarker {
   color: string;
   coffeeName: string;
+  entryId: string;
 }
 
 interface EntryDateMarker {
@@ -15,6 +16,7 @@ interface CalendarMarker {
   icon: string;
   label: string;
   type: "brew" | "roast";
+  entryId?: string;
 }
 
 interface JournalCalendarProps {
@@ -24,6 +26,7 @@ interface JournalCalendarProps {
   roastDatesByDate?: Record<string, RoastDateMarker[]>;
   selectedDate: string | null;
   onSelectDate: (date: string | null) => void;
+  onSelectRoastDate?: (entryId: string) => void;
   size?: "default" | "large";
 }
 
@@ -46,6 +49,7 @@ export default function JournalCalendar({
   roastDatesByDate = {},
   selectedDate,
   onSelectDate,
+  onSelectRoastDate,
   size = "default",
 }: JournalCalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -157,6 +161,7 @@ export default function JournalCalendar({
                     icon: "🔥",
                     label: `Roast date for ${marker.coffeeName}`,
                     type: "roast" as const,
+                    entryId: marker.entryId,
                   })),
                 ];
                 const visibleMarkers = dayMarkers.slice(0, isLarge ? 8 : 4);
@@ -167,11 +172,18 @@ export default function JournalCalendar({
                 const isSelected = selectedDate === dateKey;
 
                 return (
-                  <button
+                  <div
                     key={dayIdx}
-                    type="button"
                     onClick={() => handleDayClick(day)}
-                    disabled={!hasEntry}
+                    onKeyDown={(event) => {
+                      if (!hasEntry) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        handleDayClick(day);
+                      }
+                    }}
+                    role={hasEntry ? "button" : undefined}
+                    tabIndex={hasEntry ? 0 : undefined}
                     className={`${isLarge ? "min-h-20 h-full" : "h-10"} relative flex flex-col items-center justify-center rounded-lg transition-colors ${
                       isSelected
                         ? "ring-2 ring-primary bg-primary/10"
@@ -192,8 +204,27 @@ export default function JournalCalendar({
                         {visibleMarkers.map((marker, markerIdx) => (
                           <span
                             key={`${dateKey}-${marker.type}-${marker.color}-${markerIdx}`}
-                            className="inline-flex items-center gap-0.5 leading-none"
+                            className={`inline-flex items-center gap-0.5 leading-none ${
+                              marker.type === "roast" && marker.entryId && onSelectRoastDate
+                                ? "cursor-pointer rounded-sm hover:bg-base-200/70 focus:outline-none focus:ring-1 focus:ring-primary"
+                                : ""
+                            }`}
                             title={marker.label}
+                            role={marker.type === "roast" && marker.entryId && onSelectRoastDate ? "button" : undefined}
+                            tabIndex={marker.type === "roast" && marker.entryId && onSelectRoastDate ? 0 : undefined}
+                            onClick={(event) => {
+                              if (marker.type !== "roast" || !marker.entryId || !onSelectRoastDate) return;
+                              event.stopPropagation();
+                              onSelectRoastDate(marker.entryId);
+                            }}
+                            onKeyDown={(event) => {
+                              if (marker.type !== "roast" || !marker.entryId || !onSelectRoastDate) return;
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                onSelectRoastDate(marker.entryId);
+                              }
+                            }}
                           >
                             <span className={isLarge ? "text-xs" : "text-[9px]"} aria-hidden="true">
                               {marker.icon}
@@ -210,7 +241,7 @@ export default function JournalCalendar({
                         )}
                       </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
