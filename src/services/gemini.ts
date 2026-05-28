@@ -87,6 +87,11 @@ Equipment comparison rules:
 - For Cafec/Hario V60-compatible filter flow-rate comparisons, use this canonical order unless newer retrieved context explicitly contradicts it: fastest to slowest is Cafec T-90 → Hario V60 02 standard paper → Cafec T-92.
 - Cafec T-90 is faster-flowing than standard Hario V60 02 paper. Hario V60 02 is faster-flowing than Cafec T-92. Cafec T-92 is designed to slow drawdown/increase dwell time.
 
+Variety naming note:
+- Gesha and Geisha are the same coffee variety and are pronounced the same way: “gay-shuh.”
+- Gesha is the more linguistically accurate spelling from Ethiopia's Gesha Mountain region; Geisha is the historical Central American/Panamanian spelling that stuck in specialty coffee.
+- Preserve the spelling shown on the user's bag or chosen tag when possible, but treat both as equivalent for brew advice, journal extraction, and recommendations.
+
 Out of scope — politely decline any requests about:
 - Programming, software, or technology (outside of coffee equipment)
 - Legal, financial, or tax advice
@@ -302,7 +307,7 @@ const TAG_CATEGORIES: Record<string, string> = {
   // Roast level
   "Light": "roast level", "Medium": "roast level", "Dark": "roast level",
   // Varietals
-  "Gesha": "varietal", "Bourbon": "varietal", "Typica": "varietal",
+  "Gesha": "varietal", "Geisha": "varietal", "Bourbon": "varietal", "Typica": "varietal",
   "Catuai": "varietal", "Caturra": "varietal", "Heirloom": "varietal",
   "SL28": "varietal", "SL34": "varietal", "Pacamara": "varietal",
 };
