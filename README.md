@@ -12,6 +12,17 @@ This template equips you with a foundational React application integrated with A
 - **API**: Ready-to-use GraphQL endpoint with AWS AppSync.
 - **Database**: Real-time database powered by Amazon DynamoDB.
 
+## Configuration
+
+Barista-specific environment variables and secrets are documented in [docs/environment-and-secrets.md](docs/environment-and-secrets.md), including:
+
+- Cognito Google and Apple sign-in secrets
+- Cognito custom-domain deployment variables
+- Gemini/Gemma/OpenAI-compatible Lambda environment variables
+- How to generate Google OAuth and Apple Sign in with Apple values
+
+AI model routing, fallback behavior, and CloudWatch debugging details are documented in [docs/ai-model-routing.md](docs/ai-model-routing.md).
+
 ## Deploying to AWS
 
 For detailed instructions on deploying your application, refer to the [deployment section](https://docs.amplify.aws/react/start/quickstart/#deploy-a-fullstack-app-to-aws) of our documentation.

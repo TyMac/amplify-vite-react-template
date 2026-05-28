@@ -92,15 +92,24 @@ export default function JournalPage() {
     return formatDateKey(selectedEntry.brewDate, timezone);
   }, [selectedEntry, timezone]);
 
-  const entryColorsByDate = useMemo(() => {
-    return entries.reduce<Record<string, string[]>>((colorsByDate, entry) => {
-      if (!entry.brewDate) return colorsByDate;
+  const entryMarkersByDate = useMemo(() => {
+    return entries.reduce<Record<string, { color: string; coffeeName: string }[]>>((markersByDate, entry) => {
+      if (!entry.brewDate) return markersByDate;
       const dateKey = formatDateKey(entry.brewDate, timezone);
       const color = entry.coffeeBatchId ? batchColor(entry.coffeeBatchId) : "#6b7280";
-      colorsByDate[dateKey] = [...(colorsByDate[dateKey] ?? []), color];
-      return colorsByDate;
+      markersByDate[dateKey] = [...(markersByDate[dateKey] ?? []), { color, coffeeName: entry.coffeeName }];
+      return markersByDate;
     }, {});
   }, [entries, timezone]);
+
+  const entryColorsByDate = useMemo(() => {
+    return Object.fromEntries(
+      Object.entries(entryMarkersByDate).map(([dateKey, markers]) => [
+        dateKey,
+        markers.map((marker) => marker.color),
+      ])
+    );
+  }, [entryMarkersByDate]);
 
   const roastDatesByDate = useMemo(() => {
     return entries.reduce<Record<string, { color: string; coffeeName: string }[]>>((markersByDate, entry) => {
@@ -810,6 +819,7 @@ export default function JournalPage() {
                   <JournalCalendar
                     brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
                     entryColorsByDate={entryColorsByDate}
+                    entryMarkersByDate={entryMarkersByDate}
                     roastDatesByDate={roastDatesByDate}
                     selectedDate={selectedDateKey}
                     onSelectDate={(dateKey) => {
@@ -846,6 +856,7 @@ export default function JournalPage() {
                 size="large"
                 brewDates={entries.map((entry) => entry.brewDate).filter((date): date is string => !!date)}
                 entryColorsByDate={entryColorsByDate}
+                entryMarkersByDate={entryMarkersByDate}
                 roastDatesByDate={roastDatesByDate}
                 selectedDate={selectedDateKey}
                 onSelectDate={(dateKey) => {

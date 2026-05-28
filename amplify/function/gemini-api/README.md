@@ -28,6 +28,10 @@ Mobile App → AppSync → Lambda (AWS) → Workload Identity → GCP Vertex AI
 
 ## Configuration
 
+For the full Barista environment variable and secret inventory, including Cognito Google/Apple auth secrets and LLM Lambda variables, see `../../../docs/environment-and-secrets.md`.
+
+For AI model routing, fallback behavior, and CloudWatch debugging, see `../../../docs/ai-model-routing.md`.
+
 ### GCP Setup (Already Done)
 
 - **Project ID**: `deductive-jet-464913-p8`

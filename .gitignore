@@ -27,3 +27,38 @@ dist-ssr
 .amplify
 amplify_outputs*
 amplifyconfiguration*
+
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.so
+*.egg
+
+# graphify
+.graphify/
+graphify-out/
+.graphify*.json
+.graphify_python
+
+# AI/Tools
+.claude/
+skills/
+docs/superpowers/
+openspec/
+uv.lock
+
+# Local benchmark scripts — never commit
+scripts/run_k2_*.py
+scripts/llm.py
+scripts/benchmark_kimi*.json
+scripts/benchmark_kimi*.py

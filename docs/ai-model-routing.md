@@ -1,8 +1,25 @@
+Last updated: 2026-05-25
+
+## Amplify Backend Development Workflow (Required)
+
+When making changes to the Amplify backend (Lambda handlers, AppSync schema, environment variables, etc.):
+
+1. Make your code changes locally
+2. **Commit** the changes with a clear message
+3. **Push** to the `dev` branch
+4. Monitor the Amplify build for the `dev` branch until it reaches **SUCCEED**
+5. Verify the deployed dev web app renders and the changed functionality works correctly
+
+Never consider a backend change complete until the dev build succeeds and has been smoke-tested.
+
+---
 # Barista AI model routing, fallback, and attribution
 
-Last updated: 2026-05-17
+Last updated: 2026-05-25
 
 This document explains how Barista routes chat/vision requests across OpenAI-compatible endpoints, Gemma 4 on Vertex AI, and Gemini, how fallback works, and how the UI shows which model produced each assistant response.
+
+For the broader secret and environment variable inventory, including Cognito Google/Apple auth setup, see [environment-and-secrets.md](environment-and-secrets.md).
 
 ## Backend entry points
 

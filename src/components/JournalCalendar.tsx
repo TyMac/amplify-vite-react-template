@@ -5,9 +5,22 @@ interface RoastDateMarker {
   coffeeName: string;
 }
 
+interface EntryDateMarker {
+  color: string;
+  coffeeName: string;
+}
+
+interface CalendarMarker {
+  color: string;
+  icon: string;
+  label: string;
+  type: "brew" | "roast";
+}
+
 interface JournalCalendarProps {
   brewDates: string[];
   entryColorsByDate?: Record<string, string[]>;
+  entryMarkersByDate?: Record<string, EntryDateMarker[]>;
   roastDatesByDate?: Record<string, RoastDateMarker[]>;
   selectedDate: string | null;
   onSelectDate: (date: string | null) => void;
@@ -29,6 +42,7 @@ function formatDateKey(year: number, month: number, day: number): string {
 export default function JournalCalendar({
   brewDates,
   entryColorsByDate = {},
+  entryMarkersByDate = {},
   roastDatesByDate = {},
   selectedDate,
   onSelectDate,
@@ -119,16 +133,36 @@ export default function JournalCalendar({
 
                 const dateKey = formatDateKey(year, month, day);
                 const hasEntry = brewDateSet.has(dateKey);
-                const entryColors = entryColorsByDate[dateKey] ?? [];
-                const visibleEntryColors = entryColors.slice(0, 4);
-                const hiddenEntryColorCount = Math.max(entryColors.length - visibleEntryColors.length, 0);
+                const entryMarkers = entryMarkersByDate[dateKey] ?? [];
+                const entryColors = entryMarkers.length > 0
+                  ? entryMarkers.map((marker) => marker.color)
+                  : entryColorsByDate[dateKey] ?? [];
                 const roastMarkers = roastDatesByDate[dateKey] ?? [];
-                const firstRoastMarker = roastMarkers[0];
-                const hiddenRoastMarkerCount = Math.max(roastMarkers.length - 1, 0);
-                const roastMarkerTitle = roastMarkers.length
-                  ? roastMarkers.length === 1
-                    ? `Roast date for ${firstRoastMarker.coffeeName}`
-                    : `Roast date for ${roastMarkers.length} coffees: ${roastMarkers.map((marker) => marker.coffeeName).join(", ")}`
+                const dayMarkers: CalendarMarker[] = [
+                  ...(entryMarkers.length > 0
+                    ? entryMarkers.map((marker) => ({
+                        color: marker.color,
+                        icon: "☕",
+                        label: `Journal entry for ${marker.coffeeName}`,
+                        type: "brew" as const,
+                      }))
+                    : entryColors.map((color, index) => ({
+                        color,
+                        icon: "☕",
+                        label: `Journal entry${entryColors.length > 1 ? ` ${index + 1}` : ""}`,
+                        type: "brew" as const,
+                      }))),
+                  ...roastMarkers.map((marker) => ({
+                    color: marker.color,
+                    icon: "🔥",
+                    label: `Roast date for ${marker.coffeeName}`,
+                    type: "roast" as const,
+                  })),
+                ];
+                const visibleMarkers = dayMarkers.slice(0, isLarge ? 8 : 4);
+                const hiddenMarkerCount = Math.max(dayMarkers.length - visibleMarkers.length, 0);
+                const dayMarkerTitle = dayMarkers.length
+                  ? dayMarkers.map((marker) => marker.label).join("; ")
                   : undefined;
                 const isSelected = selectedDate === dateKey;
 
@@ -147,31 +181,32 @@ export default function JournalCalendar({
                         ? "opacity-80 cursor-default"
                         : "opacity-50 cursor-default"
                     }`}
-                    title={roastMarkerTitle}
+                    title={dayMarkerTitle}
                   >
                     <span className={isLarge ? "text-base" : "text-sm"}>{day}</span>
-                    {hasEntry && <span className={`${isLarge ? "text-xs" : "text-[10px]"} leading-none`}>☕</span>}
-                    {firstRoastMarker && (
-                      <span
-                        className={`absolute right-1 top-1 inline-flex items-center rounded-full bg-base-100/85 px-0.5 leading-none shadow-sm ${isLarge ? "text-sm" : "text-[10px]"}`}
-                        style={{ color: firstRoastMarker.color }}
-                        role="img"
-                        aria-label={roastMarkerTitle}
+                    {dayMarkers.length > 0 && (
+                      <div
+                        className={`flex max-w-full flex-wrap items-center justify-center gap-x-1 gap-y-0.5 ${isLarge ? "mt-1" : "mt-0.5"}`}
+                        aria-label={dayMarkerTitle}
                       >
-                        🔥{hiddenRoastMarkerCount > 0 && <span className="ml-0.5 text-[9px] text-base-content/60">+{hiddenRoastMarkerCount}</span>}
-                      </span>
-                    )}
-                    {entryColors.length > 0 && (
-                      <div className="flex max-w-full flex-wrap justify-center gap-0.5 mt-0.5" aria-hidden="true">
-                        {visibleEntryColors.map((color, colorIdx) => (
+                        {visibleMarkers.map((marker, markerIdx) => (
                           <span
-                            key={`${dateKey}-${color}-${colorIdx}`}
-                            className={`${isLarge ? "h-2 w-2" : "h-1.5 w-1.5"} rounded-full border border-base-100 shadow-sm`}
-                            style={{ backgroundColor: color }}
-                          />
+                            key={`${dateKey}-${marker.type}-${marker.color}-${markerIdx}`}
+                            className="inline-flex items-center gap-0.5 leading-none"
+                            title={marker.label}
+                          >
+                            <span className={isLarge ? "text-xs" : "text-[9px]"} aria-hidden="true">
+                              {marker.icon}
+                            </span>
+                            <span
+                              className={`${isLarge ? "h-2 w-2" : "h-1.5 w-1.5"} rounded-full border border-base-100 shadow-sm`}
+                              style={{ backgroundColor: marker.color }}
+                              aria-hidden="true"
+                            />
+                          </span>
                         ))}
-                        {hiddenEntryColorCount > 0 && (
-                          <span className="text-[9px] leading-none text-base-content/45">+{hiddenEntryColorCount}</span>
+                        {hiddenMarkerCount > 0 && (
+                          <span className="text-[9px] leading-none text-base-content/45">+{hiddenMarkerCount}</span>
                         )}
                       </div>
                     )}
