@@ -215,6 +215,50 @@ export default function JournalPage() {
       .sort((a, b) => (b.brewDate ?? "").localeCompare(a.brewDate ?? ""));
   }, [selectedBatch, entries]);
 
+  const catalogueJournals = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        id: string;
+        batch: Schema["CoffeeBatch"]["type"] | null;
+        entries: Schema["BrewJournal"]["type"][];
+      }
+    >();
+
+    entries.forEach((entry) => {
+      const batch = entry.coffeeBatchId
+        ? batches.find((candidate) => candidate.id === entry.coffeeBatchId) ?? null
+        : null;
+      const groupId = entry.coffeeBatchId ? `batch:${entry.coffeeBatchId}` : `entry:${entry.id}`;
+      const existing = groups.get(groupId);
+
+      if (existing) {
+        existing.entries.push(entry);
+      } else {
+        groups.set(groupId, { id: groupId, batch, entries: [entry] });
+      }
+    });
+
+    return [...groups.values()]
+      .map((journal) => {
+        const sortedJournalEntries = [...journal.entries].sort((a, b) =>
+          (b.brewDate ?? "").localeCompare(a.brewDate ?? "")
+        );
+        const representativeEntry = sortedJournalEntries[0];
+        const color = journal.batch?.color
+          ?? (representativeEntry.coffeeBatchId ? batchColor(representativeEntry.coffeeBatchId) : "#6b7280");
+        return {
+          ...journal,
+          entries: sortedJournalEntries,
+          representativeEntry,
+          color,
+        };
+      })
+      .sort((a, b) =>
+        (b.representativeEntry.brewDate ?? "").localeCompare(a.representativeEntry.brewDate ?? "")
+      );
+  }, [batches, entries]);
+
   // Related chats by tag (fallback when no batch)
   const allJournalTags = useMemo(() => {
     const tags = new Set<string>();
@@ -668,26 +712,31 @@ export default function JournalPage() {
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto p-2">
-              {entries.length === 0 ? (
+              {catalogueJournals.length === 0 ? (
                 <div className="p-4 text-center text-sm text-base-content/50">
-                  No journal entries yet.
+                  No journals yet.
                 </div>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {entries.map((entry) => {
-                    const color = entry.coffeeBatchId
-                      ? batchColor(entry.coffeeBatchId)
-                      : "#6b7280";
-                    const isActiveEntry = selectedEntryId === entry.id;
-                    const isExpanded = expandedEntryIds.has(entry.id);
-                    const linkedChats = (entry.chatSessionIds ?? [])
-                      .filter((id): id is string => !!id)
+                  {catalogueJournals.map((journal) => {
+                    const entry = journal.representativeEntry;
+                    const color = journal.color;
+                    const isActiveEntry = journal.entries.some((journalEntry) => journalEntry.id === selectedEntryId);
+                    const isExpanded = expandedEntryIds.has(journal.id);
+                    const linkedChatIds = new Set(
+                      journal.entries.flatMap((journalEntry) =>
+                        (journalEntry.chatSessionIds ?? []).filter((id): id is string => !!id)
+                      )
+                    );
+                    const linkedChats = [...linkedChatIds]
                       .map((chatId) => chatSessions.find((chat) => chat.id === chatId))
                       .filter((chat): chat is Schema["ChatSession"]["type"] => !!chat);
+                    const journalName = journal.batch?.coffeeName ?? entry.coffeeName;
+                    const roaster = journal.batch?.roaster ?? entry.roaster;
 
                     return (
                       <div
-                        key={entry.id}
+                        key={journal.id}
                         className={`rounded-xl border transition-colors ${
                           isActiveEntry ? "bg-primary/5" : "bg-base-100 hover:bg-base-200/40"
                         }`}
@@ -704,16 +753,16 @@ export default function JournalPage() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2">
                                   <p className="text-sm font-semibold truncate" style={{ color }}>
-                                    {entry.coffeeName}
+                                    {journalName}
                                   </p>
-                                  {entry.rating != null && (
-                                    <span className="text-xs text-base-content/45 flex-shrink-0">{entry.rating}/10</span>
-                                  )}
+                                  <span className="text-xs text-base-content/45 flex-shrink-0">
+                                    {journal.entries.length} brew{journal.entries.length !== 1 ? "s" : ""}
+                                  </span>
                                 </div>
                                 <div className="mt-0.5 flex items-center gap-1.5 text-xs text-base-content/45 min-w-0">
                                   {entry.brewDate && (
                                     <span className="flex-shrink-0">
-                                      {new Date(entry.brewDate).toLocaleDateString("en-US", {
+                                      Latest {new Date(entry.brewDate).toLocaleDateString("en-US", {
                                         month: "short", day: "numeric", year: "numeric", timeZone: timezone,
                                       })}
                                     </span>
@@ -725,8 +774,8 @@ export default function JournalPage() {
                                     </>
                                   )}
                                 </div>
-                                {entry.roaster && (
-                                  <p className="mt-0.5 text-xs text-base-content/40 truncate">{entry.roaster}</p>
+                                {roaster && (
+                                  <p className="mt-0.5 text-xs text-base-content/40 truncate">{roaster}</p>
                                 )}
                               </div>
                             </div>
@@ -735,11 +784,11 @@ export default function JournalPage() {
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              toggleEntryExpanded(entry.id);
+                              toggleEntryExpanded(journal.id);
                             }}
                             className="btn btn-ghost btn-xs btn-square self-center mr-2 flex-shrink-0"
                             aria-expanded={isExpanded}
-                            aria-label={`${isExpanded ? "Collapse" : "Expand"} chats for ${entry.coffeeName}`}
+                            aria-label={`${isExpanded ? "Collapse" : "Expand"} chats for ${journalName}`}
                             title={`${isExpanded ? "Hide" : "Show"} associated chats`}
                           >
                             <svg
@@ -761,7 +810,7 @@ export default function JournalPage() {
                             </p>
                             {linkedChats.length === 0 ? (
                               <p className="text-xs text-base-content/40">
-                                No chats associated with this journal entry yet.
+                                No chats associated with this journal yet.
                               </p>
                             ) : (
                               <div className="flex flex-col gap-1">
