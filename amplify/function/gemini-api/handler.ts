@@ -81,7 +81,7 @@ async function getGCPClient() {
 }
 
 /**
- * Call Vertex AI Gemini API
+ * Call Vertex AI model endpoints.
  */
 async function callVertexAI(endpoint: string, payload: any, location?: string): Promise<any> {
   const client = await getGCPClient();
@@ -277,12 +277,12 @@ function extractOpenAIText(result: any): string {
 
 /**
  * Query the RAG corpus for relevant equipment profiles, recipes, and troubleshooting data.
- * Returns retrieved text chunks to enrich the Gemini prompt.
+ * Returns retrieved text chunks to enrich the model prompt.
  * If retrieval fails or returns nothing, returns empty string (graceful degradation).
  *
  * NOTE: This replaces the old tools.retrieval.vertexRagStore approach which caused
- * Gemini to treat RAG as a grounding constraint (refusing to answer when no docs matched).
- * Manual retrieval + prompt injection lets Gemini use its full knowledge supplemented by RAG.
+ * the model to treat RAG as a grounding constraint (refusing to answer when no docs matched).
+ * Manual retrieval + prompt injection lets the model use its full knowledge supplemented by RAG.
  */
 async function queryRAG(userMessage: string): Promise<string> {
   if (!RAG_ENABLED) {
@@ -366,7 +366,7 @@ export async function handler(event: any) {
 }
 
 /**
- * Chat with Gemini Flash
+ * Chat with the configured Barista text model.
  */
 async function gemmaChat(args: { messages: string[]; systemPrompt?: string; deviceId?: string; maxOutputTokens?: number }, event: any) {
   await enforceAnonymousDailyChatLimit(args, event);
@@ -607,7 +607,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
 }
 
 /**
- * Analyze image with Gemini Vision.
+ * Analyze image with Gemini Flash fallback.
  */
 async function analyzeImageWithGeminiFlash(imageBase64: string, prompt: string) {
   const result = await callVertexAI('publishers/google/models/gemini-2.0-flash-001:generateContent', {
@@ -674,9 +674,53 @@ async function analyzeImageWithOpenAICompatible(imageBase64: string, prompt: str
   };
 }
 
+function buildVisionRagQuery(prompt: string, initialAnalysis: string): string {
+  const query = `Coffee label scan. Use visible OCR and image analysis to find matching known coffee label docs.\n\nInitial visible analysis/OCR:\n${initialAnalysis}\n\nPrompt context:\n${prompt}`;
+  return query.length > 4000 ? query.slice(0, 4000) : query;
+}
+
+function buildRagEnhancedVisionPrompt(prompt: string, initialAnalysis: string, ragContext: string): string {
+  return `${prompt}\n\nCOFFEE LABEL RAG MATCHING DATA — USE CAREFULLY:\nThe following retrieved coffee-label documents are candidate matches from Barista's curated RAG corpus. Use them to identify known coffees and normalize fields only when the visible label/OCR plausibly matches the document. Visible label text always wins over RAG. Do not copy RAG facts into the final answer if the image does not support the same coffee identity. If a match is strong, explicitly state the matched coffee name, source document/name if visible in the context, and confidence. If the match is weak or ambiguous, say so and keep uncertain fields separate.\n\n${ragContext}\n\nINITIAL VISIBLE IMAGE ANALYSIS/OCR:\n${initialAnalysis}\n\nNow produce the final scan analysis using both the image and the retrieved context. Preserve visible label spellings, normalize Gesha/Geisha only as instructed, avoid unsupported guesses, and still append the canonical tag JSON block exactly as requested above.`;
+}
+
+async function maybeEnhanceVisionWithRag(
+  prompt: string,
+  initialResult: { analysis: string; tokensUsed: number; modelUsed: string; providerUsed: string },
+  analyzeAgain: (enhancedPrompt: string) => Promise<{ analysis: string; tokensUsed: number; modelUsed: string; providerUsed: string }>
+) {
+  const ragQuery = buildVisionRagQuery(prompt, initialResult.analysis);
+  const ragContext = await queryRAG(ragQuery);
+
+  if (!ragContext) {
+    return {
+      ...initialResult,
+      ragContextUsed: false,
+      ragContextLength: 0,
+    };
+  }
+
+  console.info('Vision RAG context injected', {
+    ragContextLength: ragContext.length,
+    initialAnalysisLength: initialResult.analysis.length,
+  });
+
+  const enhancedPrompt = buildRagEnhancedVisionPrompt(prompt, initialResult.analysis, ragContext);
+  const enhancedResult = await analyzeAgain(enhancedPrompt);
+
+  return {
+    ...enhancedResult,
+    tokensUsed: initialResult.tokensUsed + enhancedResult.tokensUsed,
+    ragContextUsed: true,
+    ragContextLength: ragContext.length,
+  };
+}
+
 /**
  * Analyze image with the configured vision provider. OpenAI-compatible vision is experimental, so
  * fall back to Gemini Flash if Gemma errors or returns an empty response.
+ *
+ * The AppSync field is still named `geminiVision` for backward compatibility, but the configured
+ * provider may be Gemma. Do not rename the field until all clients/schema references migrate.
  */
 async function geminiVision(args: { imageBase64: string; prompt?: string }) {
   const { imageBase64, prompt = 'What kind of coffee beans or equipment is in this image? Provide details about origin, roast level, grinder type, or any other relevant information.' } = args;
@@ -702,13 +746,22 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
       const gemmaLatencyMs = Date.now() - gemmaStart;
 
       if (gemmaResult.analysis && gemmaResult.analysis !== 'Could not analyze image') {
+        const enhancedGemmaResult = await maybeEnhanceVisionWithRag(
+          prompt,
+          gemmaResult,
+          (enhancedPrompt) => withTimeout(
+            analyzeImageWithOpenAICompatible(imageBase64, enhancedPrompt, requestedProvider),
+            GEMMA4_VISION_TIMEOUT_MS,
+            `${requestedProvider}_vision_rag`
+          )
+        );
         const response = {
-          ...gemmaResult,
+          ...enhancedGemmaResult,
           requestedProvider,
           fallbackUsed: false,
           fallbackReason: null,
           latencyMs: Date.now() - startedAt,
-          providerLatencyMs: gemmaLatencyMs,
+          providerLatencyMs: Date.now() - gemmaStart,
         };
         console.info('Vision model selected', {
           requestedProvider,
@@ -728,7 +781,12 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
         gemmaLatencyMs,
       });
       const geminiStart = Date.now();
-      const geminiResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+      const geminiInitialResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+      const geminiResult = await maybeEnhanceVisionWithRag(
+        prompt,
+        geminiInitialResult,
+        (enhancedPrompt) => analyzeImageWithGeminiFlash(imageBase64, enhancedPrompt)
+      );
       const response = {
         ...geminiResult,
         requestedProvider,
@@ -759,7 +817,12 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
         errorData: error?.response?.data,
       });
       const geminiStart = Date.now();
-      const geminiResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+      const geminiInitialResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+      const geminiResult = await maybeEnhanceVisionWithRag(
+        prompt,
+        geminiInitialResult,
+        (enhancedPrompt) => analyzeImageWithGeminiFlash(imageBase64, enhancedPrompt)
+      );
       const response = {
         ...geminiResult,
         requestedProvider,
@@ -783,7 +846,12 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
   }
 
   const geminiStart = Date.now();
-  const geminiResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+  const geminiInitialResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+  const geminiResult = await maybeEnhanceVisionWithRag(
+    prompt,
+    geminiInitialResult,
+    (enhancedPrompt) => analyzeImageWithGeminiFlash(imageBase64, enhancedPrompt)
+  );
   const response = {
     ...geminiResult,
     requestedProvider,
