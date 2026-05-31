@@ -8,7 +8,7 @@ import type { Schema } from "../../amplify/data/resource";
 const client = generateClient<Schema>();
 
 // Equipment options (shared with barista-mobile)
-const GRINDERS = ["None","Baratza Encore","Baratza Virtuoso+","1Zpresso JX-Pro","1Zpresso ZP6 S","Comandante C40","Fellow Ode","Timemore Chestnut","Other"];
+const GRINDERS = ["None","Baratza Encore","Baratza Virtuoso+","1Zpresso JX-Pro","1Zpresso ZP6 S","1Zpresso K-Ultra","Comandante C40","Fellow Ode","Timemore Chestnut","Other"];
 const FILTER_PAPERS = ["None","Hario V60 tabbed (V02)","Hario V60 untabbed","CAFEC T-90","CAFEC T-92","CAFEC Abaca","Kalita Wave 155","Kalita Wave 185","Chemex Bonded Filters","AeroPress Micro-Filters","Sibarist FAST","Sibarist original","Other"];
 const DRIPPERS = ["None","Hario V60 01","Hario V60 02","Hario V60 03","Kalita Wave 155","Kalita Wave 185","Chemex 6-cup","Chemex 8-cup","Fellow Stagg [X]","AeroPress","Other"];
 const KETTLES = ["None","Fellow Stagg EKG","Hario Buono","Bonavita Variable Temp","Brewista Artisan","Timemore Fish","Other"];
