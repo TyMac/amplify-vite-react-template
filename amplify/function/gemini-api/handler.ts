@@ -24,6 +24,8 @@ const OPENAI_COMPAT_CHAT_MODEL = process.env.OPENAI_COMPAT_CHAT_MODEL || process
 const OPENAI_COMPAT_VISION_MODEL = process.env.OPENAI_COMPAT_VISION_MODEL || process.env.OPENAI_COMPAT_MODEL || OPENAI_COMPAT_CHAT_MODEL;
 const OPENAI_COMPAT_PROVIDER_LABEL = process.env.OPENAI_COMPAT_PROVIDER_LABEL || 'openai-compatible';
 const RAG_ENABLED = process.env.RAG_ENABLED !== 'false';
+const RAG_SIMILARITY_TOP_K = Math.max(1, Math.min(Number(process.env.RAG_SIMILARITY_TOP_K || 4), 10));
+const RAG_CONTEXT_MAX_CHARS = Math.max(1000, Number(process.env.RAG_CONTEXT_MAX_CHARS || 8000));
 const GEMMA4_CHAT_TIMEOUT_MS = Number(process.env.GEMMA4_CHAT_TIMEOUT_MS || 8000);
 const GEMMA4_VISION_TIMEOUT_MS = Number(process.env.GEMMA4_VISION_TIMEOUT_MS || 20000);
 const AI_USAGE_LIMIT_TABLE_NAME = process.env.AI_USAGE_LIMIT_TABLE_NAME;
@@ -290,6 +292,12 @@ async function queryRAG(userMessage: string): Promise<string> {
     return '';
   }
 
+  const normalizedMessage = userMessage.trim();
+  if (normalizedMessage.length < 12) {
+    console.log('RAG skipped: latest user message too short for useful retrieval');
+    return '';
+  }
+
   try {
     const client = await getGCPClient();
     const url = `https://${RAG_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${GCP_PROJECT_ID}/locations/${RAG_LOCATION}:retrieveContexts`;
@@ -304,8 +312,8 @@ async function queryRAG(userMessage: string): Promise<string> {
           ragResources: [{ ragCorpus: RAG_CORPUS }],
         },
         query: {
-          text: userMessage,
-          similarityTopK: 10,
+          text: normalizedMessage,
+          similarityTopK: RAG_SIMILARITY_TOP_K,
         },
       },
     } as any);
@@ -318,12 +326,23 @@ async function queryRAG(userMessage: string): Promise<string> {
 
     console.log(`RAG: Retrieved ${contexts.length} context(s)`);
 
-    const chunks = contexts.map((ctx: any, i: number) => {
+    const chunks: string[] = [];
+    let totalChars = 0;
+    for (let i = 0; i < contexts.length; i += 1) {
+      const ctx = contexts[i];
       const source = ctx.source_display_name || ctx.source_uri || `Source ${i + 1}`;
       const score = ctx.score ? ` (relevance: ${ctx.score.toFixed(3)})` : '';
-      return `### ${source}${score}\n${ctx.text}`;
-    });
+      const header = `### ${source}${score}\n`;
+      const remaining = RAG_CONTEXT_MAX_CHARS - totalChars - header.length;
+      if (remaining <= 0) break;
+      const text = String(ctx.text || '');
+      const body = text.length > remaining ? `${text.slice(0, remaining)}\n[Context truncated]` : text;
+      const chunk = `${header}${body}`;
+      chunks.push(chunk);
+      totalChars += chunk.length + 2;
+    }
 
+    console.log(`RAG: Injecting ${chunks.length} context(s), capped at ${RAG_CONTEXT_MAX_CHARS} chars`);
     return chunks.join('\n\n');
   } catch (error: any) {
     console.error('RAG retrieval failed (non-fatal):', error.message);
