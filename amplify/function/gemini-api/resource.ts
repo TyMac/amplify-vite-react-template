@@ -1,4 +1,4 @@
-import { defineFunction } from "@aws-amplify/backend";
+import { defineFunction, secret } from "@aws-amplify/backend";
 
 export const geminiApi = defineFunction({
   name: "gemini-api",
@@ -16,17 +16,19 @@ export const geminiApi = defineFunction({
       "barista-vertex-ai@deductive-jet-464913-p8.iam.gserviceaccount.com",
     VERTEX_LOCATION: "us-south1",
     VERTEX_OPENAI_LOCATION: "global",
-    CHAT_MODEL_PROVIDER: "gemma4",
-    VISION_MODEL_PROVIDER: "gemma4",
+    CHAT_MODEL_PROVIDER: "ollama",
+    VISION_MODEL_PROVIDER: "gemini",
     EXTRACTION_MODEL_PROVIDER: "gemini",
     GEMMA4_MAAS_MODEL: "google/gemma-4-26b-a4b-it-maas",
-    // Leave OPENAI_COMPAT_CHAT_URL blank to use Vertex AI's OpenAI-compatible endpoint.
-    // Set it to a full /chat/completions URL to route to Ollama, Cloudflare, or on-prem.
-    OPENAI_COMPAT_CHAT_URL: "",
+    // Route Barista chat through the Mac Studio Ollama endpoint exposed by
+    // Home Assistant Cloudflared. Keep vision/extraction on Gemini for now.
+    OPENAI_COMPAT_CHAT_URL: "https://llm.y337.org/v1/chat/completions",
+    OPENAI_COMPAT_API_KEY: secret("OPENAI_COMPAT_API_KEY"),
+    OPENAI_COMPAT_CHAT_MODEL: "llama3.2:latest",
     OPENAI_COMPAT_MODEL: "google/gemma-4-26b-a4b-it-maas",
-    OPENAI_COMPAT_PROVIDER_LABEL: "gemma4",
+    OPENAI_COMPAT_PROVIDER_LABEL: "mac-studio-ollama",
     RAG_ENABLED: "true",
-    GEMMA4_CHAT_TIMEOUT_MS: "8000",
+    GEMMA4_CHAT_TIMEOUT_MS: "12000",
     GEMMA4_VISION_TIMEOUT_MS: "20000",
     // RAG_CORPUS_ID: 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904',
   },

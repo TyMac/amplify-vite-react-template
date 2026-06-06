@@ -65,7 +65,7 @@ Defined in `amplify/function/gemini-api/resource.ts`; details and routing behavi
 | `OPENAI_COMPAT_CHAT_MODEL` | Optional chat/extraction-specific override, read by handler if set |
 | `OPENAI_COMPAT_VISION_MODEL` | Optional vision-specific override, read by handler if set |
 | `OPENAI_COMPAT_PROVIDER_LABEL` | Metadata label returned to UI |
-| `OPENAI_COMPAT_API_KEY` / `OPENAI_API_KEY` | Optional bearer token for external OpenAI-compatible endpoints; do not commit real values |
+| `OPENAI_COMPAT_API_KEY` / `OPENAI_API_KEY` | Bearer token for external OpenAI-compatible endpoints; declared with `secret("OPENAI_COMPAT_API_KEY")`; do not commit real values |
 | `RAG_ENABLED` | Set `false` to skip Vertex RAG retrieval |
 | `RAG_LOCATION` | RAG retrieval location, currently `us-south1` if set or defaulted |
 | `RAG_CORPUS` | Full Vertex RAG corpus resource path if overriding handler default |
@@ -89,6 +89,15 @@ npx ampx sandbox secret set APPLE_PRIVATE_KEY
 ```
 
 For hosted Amplify branches, set the corresponding secrets/environment variables in the Amplify Console for the correct app and branch. Keep dev/prod values separate when callback URLs, domains, or client IDs differ.
+
+Current dev LLM routing uses the Mac Studio Ollama proxy exposed through Home Assistant Cloudflared:
+
+- `CHAT_MODEL_PROVIDER=ollama`
+- `OPENAI_COMPAT_CHAT_URL=https://llm.y337.org/v1/chat/completions`
+- `OPENAI_COMPAT_CHAT_MODEL=llama3.2:latest`
+- `OPENAI_COMPAT_PROVIDER_LABEL=mac-studio-ollama`
+- `OPENAI_COMPAT_API_KEY` is stored as an Amplify/SSM SecureString secret, not committed.
+- `VISION_MODEL_PROVIDER=gemini` and `EXTRACTION_MODEL_PROVIDER=gemini` remain on Gemini for image analysis and structured field extraction.
 
 Before rotating any value, confirm whether the old value is still needed by an existing mobile build. Mobile builds can keep older generated Cognito config until a new EAS/TestFlight/App Store build ships.
 
