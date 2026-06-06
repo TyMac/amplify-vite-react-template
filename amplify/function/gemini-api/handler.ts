@@ -137,6 +137,9 @@ async function callOpenAICompatible(payload: any): Promise<any> {
 
   const headers: Record<string, string> = {
     'content-type': 'application/json',
+    // The Mac Studio's small authenticated proxy is intentionally simple; closing
+    // each request avoids HTTP/1.1 keep-alive edge cases through Cloudflared.
+    connection: 'close',
   };
   if (OPENAI_COMPAT_API_KEY) {
     headers.authorization = `Bearer ${OPENAI_COMPAT_API_KEY}`;
