@@ -94,7 +94,7 @@ Current dev LLM routing uses the Mac Studio Ollama proxy exposed through Home As
 
 - `CHAT_MODEL_PROVIDER=ollama`
 - `OPENAI_COMPAT_CHAT_URL=https://llm.y337.org/v1/chat/completions`
-- `OPENAI_COMPAT_CHAT_MODEL=llama3.2:latest`
+- `OPENAI_COMPAT_CHAT_MODEL=barista:latest`
 - `OPENAI_COMPAT_PROVIDER_LABEL=mac-studio-ollama`
 - `OPENAI_COMPAT_API_KEY` is stored as an Amplify/SSM SecureString secret, not committed.
 - `VISION_MODEL_PROVIDER=gemini` and `EXTRACTION_MODEL_PROVIDER=gemini` remain on Gemini for image analysis and structured field extraction.
