@@ -17,15 +17,23 @@ export interface AiTextResult {
 }
 
 export function getModelDisplayLabel(metadata: { modelUsed?: unknown; providerUsed?: unknown }): string | undefined {
-  const model = String(metadata.modelUsed ?? "").toLowerCase();
-  const provider = String(metadata.providerUsed ?? "").toLowerCase();
-  const combined = `${provider} ${model}`.trim();
+  const modelUsed = String(metadata.modelUsed ?? "").trim();
+  const providerUsed = String(metadata.providerUsed ?? "").trim();
+  const normalizedModel = modelUsed.toLowerCase();
+  const normalizedProvider = providerUsed.toLowerCase();
+  const combined = `${normalizedProvider} ${normalizedModel}`.trim();
 
   if (!combined) return undefined;
-  if (combined.includes("gemma")) return "Gemma";
+
+  // Fallback responses should identify the actual fallback family, not the originally requested provider.
   if (combined.includes("gemini")) return "Gemini";
 
-  return String(metadata.providerUsed || metadata.modelUsed || "AI");
+  // Assistant bubble attribution is intended to show the concrete model that answered.
+  // For OpenAI-compatible/Ollama routes this is more useful than the provider label
+  // (for example: llama3.2:latest or gemma4:26b instead of mac-studio-ollama).
+  if (modelUsed) return modelUsed;
+
+  return providerUsed || "AI";
 }
 
 const clients: Partial<Record<AuthMode, ReturnType<typeof generateClient<Schema>>>> = {};
