@@ -852,7 +852,7 @@ function buildCompactVisionRetryPrompt(_originalPrompt: string): string {
   // Gemma 4 MaaS can return an empty message for the long mobile prompt; the
   // compact retry is a recovery path whose text is still tag-parsed deterministically
   // by the mobile client.
-  return `You are analyzing a coffee bag or coffee label image for Barista. Read visible roaster, origin, variety, process, and tasting notes if possible. Return concise text plus confidence. If no roast date is visible, ask: "What is the roast date?"`;
+  return `You are analyzing a coffee bag or coffee label image for Barista. Read visible roaster, origin, variety, process, and tasting notes if possible. Return concise text plus confidence.`;
 }
 
 function buildVisionRagQuery(prompt: string, initialAnalysis: string): string {
