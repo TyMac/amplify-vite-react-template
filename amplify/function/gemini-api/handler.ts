@@ -847,6 +847,30 @@ async function analyzeImageWithOpenAICompatible(imageBase64: string, prompt: str
   };
 }
 
+function buildCompactVisionRetryPrompt(originalPrompt: string): string {
+  const wantsCanonicalTags = originalPrompt.includes('BARISTA_CANONICAL_TAGS_JSON_START');
+  return `You are an expert specialty coffee barista analyzing a coffee bag/label photo.
+
+Extract the visible coffee information. Keep it concise and practical for a mobile chat:
+- roaster and coffee/product name
+- farm/producer
+- country/region
+- variety/cultivar
+- process
+- tasting notes
+- altitude or brew-relevant details if visible
+- if no roast date is visible, end by asking: "What is the roast date?"
+
+Preserve visible label spellings. Gesha and Geisha are the same variety; do not infer Pink Bourbon unless the label explicitly says it.
+
+If text is partially unreadable, return what is legible and mark uncertain fields. Do not return an empty response.${wantsCanonicalTags ? `
+
+If you can identify obvious canonical coffee tags from the visible label, append them as a JSON string array between these exact markers. Use only obvious human-readable tag names from the label; if unsure, use [].
+BARISTA_CANONICAL_TAGS_JSON_START
+[]
+BARISTA_CANONICAL_TAGS_JSON_END` : ''}`;
+}
+
 function buildVisionRagQuery(prompt: string, initialAnalysis: string): string {
   const query = `Coffee label scan. Use visible OCR and image analysis to find matching known coffee label docs.\n\nInitial visible analysis/OCR:\n${initialAnalysis}\n\nPrompt context:\n${prompt}`;
   return query.length > 4000 ? query.slice(0, 4000) : query;
@@ -968,11 +992,79 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
         return JSON.stringify(response);
       }
 
-      console.warn('OpenAI-compatible vision returned empty analysis; falling back to Gemini Flash', {
+      console.warn('OpenAI-compatible vision returned empty analysis; retrying with compact vision prompt', {
         requestedProvider,
         openAiModel: OPENAI_COMPAT_VISION_MODEL,
         gemmaLatencyMs,
+        originalPromptLength: prompt.length,
       });
+
+      try {
+        const compactPrompt = buildCompactVisionRetryPrompt(prompt);
+        const compactStart = Date.now();
+        const compactGemmaResult = await withTimeout(
+          analyzeImageWithOpenAICompatible(imageBase64, compactPrompt, requestedProvider),
+          GEMMA4_VISION_TIMEOUT_MS,
+          `${requestedProvider}_vision_compact_retry`
+        );
+
+        if (compactGemmaResult.analysis && compactGemmaResult.analysis !== 'Could not analyze image') {
+          console.info('OpenAI-compatible vision compact retry succeeded', {
+            requestedProvider,
+            openAiModel: OPENAI_COMPAT_VISION_MODEL,
+            compactPromptLength: compactPrompt.length,
+            compactLatencyMs: Date.now() - compactStart,
+            tokensUsed: compactGemmaResult.tokensUsed,
+          });
+
+          const enhancedCompactResult = await maybeEnhanceVisionWithRag(
+            compactPrompt,
+            compactGemmaResult,
+            (enhancedPrompt) => withTimeout(
+              analyzeImageWithOpenAICompatible(imageBase64, enhancedPrompt, requestedProvider),
+              GEMMA4_VISION_TIMEOUT_MS,
+              `${requestedProvider}_vision_rag_compact_retry`
+            )
+          );
+
+          const response = {
+            ...enhancedCompactResult,
+            requestedProvider,
+            fallbackUsed: false,
+            fallbackReason: `${requestedProvider}_empty_response_compact_retry`,
+            latencyMs: Date.now() - startedAt,
+            providerLatencyMs: Date.now() - gemmaStart,
+          };
+          console.info('Vision model selected', {
+            requestedProvider,
+            providerUsed: response.providerUsed,
+            modelUsed: response.modelUsed,
+            fallbackUsed: response.fallbackUsed,
+            fallbackReason: response.fallbackReason,
+            tokensUsed: response.tokensUsed,
+            latencyMs: response.latencyMs,
+            providerLatencyMs: response.providerLatencyMs,
+          });
+          return JSON.stringify(response);
+        }
+
+        console.warn('OpenAI-compatible compact vision retry also returned empty; falling back to Gemini Flash', {
+          requestedProvider,
+          openAiModel: OPENAI_COMPAT_VISION_MODEL,
+          compactPromptLength: compactPrompt.length,
+          compactLatencyMs: Date.now() - compactStart,
+          tokensUsed: compactGemmaResult.tokensUsed,
+        });
+      } catch (compactError: any) {
+        console.error('OpenAI-compatible compact vision retry failed; falling back to Gemini Flash', {
+          requestedProvider,
+          openAiModel: OPENAI_COMPAT_VISION_MODEL,
+          compactFallbackReason: `${requestedProvider}_compact_retry_error:${compactError?.response?.status || compactError?.code || compactError?.message || 'unknown'}`,
+          errorMessage: compactError?.message,
+          errorStatus: compactError?.response?.status,
+        });
+      }
+
       const geminiStart = Date.now();
       try {
         const geminiInitialResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
