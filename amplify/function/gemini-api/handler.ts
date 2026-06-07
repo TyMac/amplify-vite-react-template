@@ -497,6 +497,11 @@ Use the above data in your response. Now follow the general instructions below.
       chat_template_kwargs: {
         enable_thinking: false,
       },
+      // Ollama's OpenAI-compatible API for Gemma 4 honors this and returns
+      // final answer content instead of spending the whole budget in reasoning.
+      reasoning: {
+        effort: 'none',
+      },
     });
     return {
       response: extractOpenAIText(result) || 'No response generated',
