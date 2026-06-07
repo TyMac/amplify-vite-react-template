@@ -112,6 +112,22 @@ function openAICompatibleUrl(): string {
   return OPENAI_COMPAT_CHAT_URL.trim();
 }
 
+function redactLargeOrSensitiveLogValue(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(redactLargeOrSensitiveLogValue);
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => {
+    if (key === 'imageBase64' && typeof entry === 'string') {
+      return [key, `[REDACTED imageBase64 length=${entry.length}]`];
+    }
+    return [key, redactLargeOrSensitiveLogValue(entry)];
+  }));
+}
+
 /**
  * Call an OpenAI-compatible chat completions endpoint.
  *
@@ -358,14 +374,14 @@ async function queryRAG(userMessage: string): Promise<string> {
  * Routes to appropriate function based on field name
  */
 export async function handler(event: any) {
-  console.log('Full event:', JSON.stringify(event, null, 2));
+  console.log('Full event:', JSON.stringify(redactLargeOrSensitiveLogValue(event), null, 2));
   
   // AppSync sends fieldName in event.info.fieldName
   const fieldName = event.info?.fieldName || event.fieldName;
   const args = event.arguments || event;
   
   console.log('Field name:', fieldName);
-  console.log('Arguments:', JSON.stringify(args, null, 2));
+  console.log('Arguments:', JSON.stringify(redactLargeOrSensitiveLogValue(args), null, 2));
 
   try {
     switch (fieldName) {
