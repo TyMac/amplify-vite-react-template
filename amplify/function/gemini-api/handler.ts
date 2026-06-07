@@ -974,31 +974,50 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
         gemmaLatencyMs,
       });
       const geminiStart = Date.now();
-      const geminiInitialResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
-      const geminiResult = await maybeEnhanceVisionWithRag(
-        prompt,
-        geminiInitialResult,
-        (enhancedPrompt) => analyzeImageWithGeminiFlash(imageBase64, enhancedPrompt)
-      );
-      const response = {
-        ...geminiResult,
-        requestedProvider,
-        fallbackUsed: true,
-        fallbackReason: `${requestedProvider}_empty_response`,
-        latencyMs: Date.now() - startedAt,
-        providerLatencyMs: Date.now() - geminiStart,
-      };
-      console.info('Vision model selected', {
-        requestedProvider,
-        providerUsed: response.providerUsed,
-        modelUsed: response.modelUsed,
-        fallbackUsed: response.fallbackUsed,
-        fallbackReason: response.fallbackReason,
-        tokensUsed: response.tokensUsed,
-        latencyMs: response.latencyMs,
-        providerLatencyMs: response.providerLatencyMs,
-      });
-      return JSON.stringify(response);
+      try {
+        const geminiInitialResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+        const geminiResult = await maybeEnhanceVisionWithRag(
+          prompt,
+          geminiInitialResult,
+          (enhancedPrompt) => analyzeImageWithGeminiFlash(imageBase64, enhancedPrompt)
+        );
+        const response = {
+          ...geminiResult,
+          requestedProvider,
+          fallbackUsed: true,
+          fallbackReason: `${requestedProvider}_empty_response`,
+          latencyMs: Date.now() - startedAt,
+          providerLatencyMs: Date.now() - geminiStart,
+        };
+        console.info('Vision model selected', {
+          requestedProvider,
+          providerUsed: response.providerUsed,
+          modelUsed: response.modelUsed,
+          fallbackUsed: response.fallbackUsed,
+          fallbackReason: response.fallbackReason,
+          tokensUsed: response.tokensUsed,
+          latencyMs: response.latencyMs,
+          providerLatencyMs: response.providerLatencyMs,
+        });
+        return JSON.stringify(response);
+      } catch (fallbackError: any) {
+        console.error('Gemini vision fallback failed after empty OpenAI-compatible analysis; returning non-throwing vision result', {
+          requestedProvider,
+          openAiModel: OPENAI_COMPAT_VISION_MODEL,
+          fallbackErrorMessage: fallbackError?.message,
+          fallbackErrorStatus: fallbackError?.response?.status,
+        });
+
+        const response = {
+          ...gemmaResult,
+          requestedProvider,
+          fallbackUsed: false,
+          fallbackReason: `${requestedProvider}_empty_response;gemini_fallback_error:${fallbackError?.response?.status || fallbackError?.code || fallbackError?.message || 'unknown'}`,
+          latencyMs: Date.now() - startedAt,
+          providerLatencyMs: gemmaLatencyMs,
+        };
+        return JSON.stringify(response);
+      }
     } catch (error: any) {
       const fallbackReason = `${requestedProvider}_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
       console.error('OpenAI-compatible vision failed; falling back to Gemini Flash', {
@@ -1007,34 +1026,58 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
         fallbackReason,
         errorMessage: error?.message,
         errorStatus: error?.response?.status,
-        errorData: error?.response?.data,
       });
       const geminiStart = Date.now();
-      const geminiInitialResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
-      const geminiResult = await maybeEnhanceVisionWithRag(
-        prompt,
-        geminiInitialResult,
-        (enhancedPrompt) => analyzeImageWithGeminiFlash(imageBase64, enhancedPrompt)
-      );
-      const response = {
-        ...geminiResult,
-        requestedProvider,
-        fallbackUsed: true,
-        fallbackReason,
-        latencyMs: Date.now() - startedAt,
-        providerLatencyMs: Date.now() - geminiStart,
-      };
-      console.info('Vision model selected', {
-        requestedProvider,
-        providerUsed: response.providerUsed,
-        modelUsed: response.modelUsed,
-        fallbackUsed: response.fallbackUsed,
-        fallbackReason: response.fallbackReason,
-        tokensUsed: response.tokensUsed,
-        latencyMs: response.latencyMs,
-        providerLatencyMs: response.providerLatencyMs,
-      });
-      return JSON.stringify(response);
+      try {
+        const geminiInitialResult = await analyzeImageWithGeminiFlash(imageBase64, prompt);
+        const geminiResult = await maybeEnhanceVisionWithRag(
+          prompt,
+          geminiInitialResult,
+          (enhancedPrompt) => analyzeImageWithGeminiFlash(imageBase64, enhancedPrompt)
+        );
+        const response = {
+          ...geminiResult,
+          requestedProvider,
+          fallbackUsed: true,
+          fallbackReason,
+          latencyMs: Date.now() - startedAt,
+          providerLatencyMs: Date.now() - geminiStart,
+        };
+        console.info('Vision model selected', {
+          requestedProvider,
+          providerUsed: response.providerUsed,
+          modelUsed: response.modelUsed,
+          fallbackUsed: response.fallbackUsed,
+          fallbackReason: response.fallbackReason,
+          tokensUsed: response.tokensUsed,
+          latencyMs: response.latencyMs,
+          providerLatencyMs: response.providerLatencyMs,
+        });
+        return JSON.stringify(response);
+      } catch (fallbackError: any) {
+        console.error('Gemini vision fallback failed after OpenAI-compatible vision error; returning non-throwing vision result', {
+          requestedProvider,
+          openAiModel: OPENAI_COMPAT_VISION_MODEL,
+          primaryFallbackReason: fallbackReason,
+          fallbackErrorMessage: fallbackError?.message,
+          fallbackErrorStatus: fallbackError?.response?.status,
+        });
+
+        const response = {
+          analysis: 'Could not analyze image',
+          tokensUsed: 0,
+          modelUsed: OPENAI_COMPAT_VISION_MODEL,
+          providerUsed: requestedProvider === 'gemma4'
+            ? 'gemma4'
+            : resolveOpenAICompatibleProviderLabel(requestedProvider),
+          requestedProvider,
+          fallbackUsed: true,
+          fallbackReason: `${fallbackReason};gemini_fallback_error:${fallbackError?.response?.status || fallbackError?.code || fallbackError?.message || 'unknown'}`,
+          latencyMs: Date.now() - startedAt,
+          providerLatencyMs: Date.now() - geminiStart,
+        };
+        return JSON.stringify(response);
+      }
     }
   }
 
