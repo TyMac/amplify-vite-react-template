@@ -852,21 +852,7 @@ function buildCompactVisionRetryPrompt(_originalPrompt: string): string {
   // Gemma 4 MaaS can return an empty message for the long mobile prompt; the
   // compact retry is a recovery path whose text is still tag-parsed deterministically
   // by the mobile client.
-  return `You are an expert specialty coffee barista analyzing a coffee bag/label photo.
-
-Extract the visible coffee information. Keep it concise and practical for a mobile chat:
-- roaster and coffee/product name
-- farm/producer
-- country/region
-- variety/cultivar
-- process
-- tasting notes
-- altitude or brew-relevant details if visible
-- if no roast date is visible, end by asking: "What is the roast date?"
-
-Preserve visible label spellings. Gesha and Geisha are the same variety; do not infer Pink Bourbon unless the label explicitly says it.
-
-If text is partially unreadable, return what is legible and mark uncertain fields. Do not return an empty response.`;
+  return `You are analyzing a coffee bag or coffee label image for Barista. Read visible roaster, origin, variety, process, and tasting notes if possible. Return concise text plus confidence. If no roast date is visible, ask: "What is the roast date?"`;
 }
 
 function buildVisionRagQuery(prompt: string, initialAnalysis: string): string {
