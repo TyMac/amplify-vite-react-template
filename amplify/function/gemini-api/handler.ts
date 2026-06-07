@@ -21,6 +21,10 @@ const GEMMA4_MAAS_MODEL = process.env.GEMMA4_MAAS_MODEL || 'google/gemma-4-26b-a
 const OPENAI_COMPAT_CHAT_URL = process.env.OPENAI_COMPAT_CHAT_URL || '';
 const OPENAI_COMPAT_API_KEY = process.env.OPENAI_COMPAT_API_KEY || process.env.OPENAI_API_KEY || '';
 const OPENAI_COMPAT_CHAT_MODEL = process.env.OPENAI_COMPAT_CHAT_MODEL || process.env.OPENAI_COMPAT_MODEL || GEMMA4_MAAS_MODEL;
+const OPENAI_COMPAT_CHAT_FALLBACK_MODELS = (process.env.OPENAI_COMPAT_CHAT_FALLBACK_MODELS || 'barista:latest,llama3.2:latest')
+  .split(',')
+  .map((model) => model.trim())
+  .filter((model, index, models) => model && models.indexOf(model) === index);
 const OPENAI_COMPAT_VISION_MODEL = process.env.OPENAI_COMPAT_VISION_MODEL || process.env.OPENAI_COMPAT_MODEL || OPENAI_COMPAT_CHAT_MODEL;
 const OPENAI_COMPAT_PROVIDER_LABEL = process.env.OPENAI_COMPAT_PROVIDER_LABEL || 'openai-compatible';
 const RAG_ENABLED = process.env.RAG_ENABLED !== 'false';
@@ -28,6 +32,14 @@ const RAG_SIMILARITY_TOP_K = Math.max(1, Math.min(Number(process.env.RAG_SIMILAR
 const RAG_CONTEXT_MAX_CHARS = Math.max(1000, Number(process.env.RAG_CONTEXT_MAX_CHARS || 8000));
 const GEMMA4_CHAT_TIMEOUT_MS = Number(process.env.GEMMA4_CHAT_TIMEOUT_MS || 8000);
 const GEMMA4_VISION_TIMEOUT_MS = Number(process.env.GEMMA4_VISION_TIMEOUT_MS || 20000);
+const GEMINI_CHAT_FALLBACK_MODELS = (process.env.GEMINI_CHAT_FALLBACK_MODELS || 'gemini-2.0-flash-lite-001,gemini-2.0-flash-001')
+  .split(',')
+  .map((model) => model.trim())
+  .filter((model, index, models) => model && models.indexOf(model) === index);
+const GEMINI_CHAT_FALLBACK_LOCATIONS = (process.env.GEMINI_CHAT_FALLBACK_LOCATIONS || `${VERTEX_LOCATION},us-central1`)
+  .split(',')
+  .map((location) => location.trim())
+  .filter((location, index, locations) => location && locations.indexOf(location) === index);
 const AI_USAGE_LIMIT_TABLE_NAME = process.env.AI_USAGE_LIMIT_TABLE_NAME;
 const ANONYMOUS_DAILY_CHAT_LIMIT = Number(process.env.ANONYMOUS_DAILY_CHAT_LIMIT || 3);
 
@@ -136,7 +148,7 @@ function redactLargeOrSensitiveLogValue(value: any): any {
  * payload shape to an external OpenAI-compatible endpoint such as Ollama,
  * Cloudflare, or an on-prem gateway. OPENAI_COMPAT_API_KEY is optional.
  */
-async function callOpenAICompatible(payload: any, options?: { forceVertex?: boolean }): Promise<any> {
+async function callOpenAICompatible(payload: any, options?: { forceVertex?: boolean; timeoutMs?: number; timeoutLabel?: string }): Promise<any> {
   const customUrl = options?.forceVertex ? '' : openAICompatibleUrl();
   if (!customUrl) {
     const client = await getGCPClient();
@@ -161,11 +173,28 @@ async function callOpenAICompatible(payload: any, options?: { forceVertex?: bool
     headers.authorization = `Bearer ${OPENAI_COMPAT_API_KEY}`;
   }
 
-  const response = await fetch(customUrl, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload),
-  });
+  const timeoutMs = Number(options?.timeoutMs || 0);
+  const controller = timeoutMs > 0 ? new AbortController() : undefined;
+  const timeout = controller
+    ? setTimeout(() => controller.abort(new Error(`${options?.timeoutLabel || 'openai_compatible'}_timeout_${timeoutMs}ms`)), timeoutMs)
+    : undefined;
+
+  let response: Response;
+  try {
+    response = await fetch(customUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller?.signal,
+    });
+  } catch (error: any) {
+    if (controller?.signal.aborted) {
+      throw controller.signal.reason || new Error(`${options?.timeoutLabel || 'openai_compatible'}_timeout_${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 
   const responseText = await response.text();
   let data: any = null;
@@ -374,14 +403,16 @@ async function queryRAG(userMessage: string): Promise<string> {
  * Routes to appropriate function based on field name
  */
 export async function handler(event: any) {
-  console.log('Full event:', JSON.stringify(redactLargeOrSensitiveLogValue(event), null, 2));
-  
   // AppSync sends fieldName in event.info.fieldName
   const fieldName = event.info?.fieldName || event.fieldName;
   const args = event.arguments || event;
   
-  console.log('Field name:', fieldName);
-  console.log('Arguments:', JSON.stringify(redactLargeOrSensitiveLogValue(args), null, 2));
+  console.log('AppSync request received:', JSON.stringify(redactLargeOrSensitiveLogValue({
+    fieldName,
+    argumentKeys: Object.keys(args || {}),
+    requestId: event.request?.headers?.['x-amzn-requestid'] || event.requestContext?.requestId,
+    identityType: event.identity?.claims ? 'cognito' : event.identity ? 'appsync' : 'unknown',
+  }), null, 2));
 
   try {
     switch (fieldName) {
@@ -446,8 +477,6 @@ Use the above data in your response. Now follow the general instructions below.
   enrichedPrompt += `${EQUIPMENT_COMPARISON_RULES}\n\n`;
   enrichedPrompt += systemPrompt || '';
 
-  const geminiModel = 'gemini-2.0-flash-lite-001';
-
   const callGeminiChat = async () => {
     const contents = messages.map((msg) => ({
       role: msg.role === 'assistant' ? 'model' : 'user',
@@ -469,20 +498,40 @@ Use the above data in your response. Now follow the general instructions below.
       };
     }
 
-    console.log(`Using chat model: ${geminiModel}`);
-    const result = await callVertexAI(`publishers/google/models/${geminiModel}:generateContent`, payload);
-    return {
-      response: result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated',
-      tokensUsed: result.usageMetadata?.totalTokenCount || 0,
-      modelUsed: geminiModel,
-      providerUsed: 'gemini',
-    };
+    const errors: string[] = [];
+    for (const model of GEMINI_CHAT_FALLBACK_MODELS) {
+      for (const location of GEMINI_CHAT_FALLBACK_LOCATIONS) {
+        try {
+          console.log(`Using fallback chat model: ${model} in ${location}`);
+          const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload, location);
+          return {
+            response: result.candidates?.[0]?.content?.parts?.[0]?.text || 'No response generated',
+            tokensUsed: result.usageMetadata?.totalTokenCount || 0,
+            modelUsed: model,
+            providerUsed: 'gemini',
+            providerLocation: location,
+          };
+        } catch (error: any) {
+          const reason = `${model}@${location}:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
+          errors.push(reason);
+          console.warn('Gemini fallback chat attempt failed', {
+            modelUsed: model,
+            location,
+            errorMessage: error?.message,
+            errorStatus: error?.response?.status,
+            errorData: error?.response?.data,
+          });
+        }
+      }
+    }
+
+    throw new Error(`Gemini fallback chat failed in all configured models/locations: ${errors.join('; ')}`);
   };
 
-  const callOpenAICompatibleChat = async () => {
-    console.log(`Using OpenAI-compatible chat model: ${OPENAI_COMPAT_CHAT_MODEL}`);
+  const callOpenAICompatibleChat = async (model = OPENAI_COMPAT_CHAT_MODEL) => {
+    console.log(`Using OpenAI-compatible chat model: ${model}`);
     const result = await callOpenAICompatible({
-      model: OPENAI_COMPAT_CHAT_MODEL,
+      model,
       stream: false,
       max_tokens: maxOutputTokens,
       messages: [
@@ -502,13 +551,55 @@ Use the above data in your response. Now follow the general instructions below.
       reasoning: {
         effort: 'none',
       },
+    }, {
+      timeoutMs: GEMMA4_CHAT_TIMEOUT_MS,
+      timeoutLabel: `${requestedProvider}_chat`,
     });
     return {
       response: extractOpenAIText(result) || 'No response generated',
       tokensUsed: result.usage?.total_tokens || 0,
-      modelUsed: OPENAI_COMPAT_CHAT_MODEL,
+      modelUsed: model,
       providerUsed: resolveOpenAICompatibleProviderLabel(requestedProvider),
     };
+  };
+
+  const callOpenAICompatibleFallbackModels = async (fallbackReason: string) => {
+    for (const fallbackModel of OPENAI_COMPAT_CHAT_FALLBACK_MODELS) {
+      if (fallbackModel === OPENAI_COMPAT_CHAT_MODEL) continue;
+      try {
+        const fallbackStart = Date.now();
+        const fallbackResult = await withTimeout(
+          callOpenAICompatibleChat(fallbackModel),
+          GEMMA4_CHAT_TIMEOUT_MS,
+          `${requestedProvider}_fallback_${fallbackModel}_chat`
+        );
+        const fallbackLatencyMs = Date.now() - fallbackStart;
+        if (fallbackResult.response && fallbackResult.response !== 'No response generated') {
+          return {
+            ...fallbackResult,
+            requestedProvider,
+            fallbackUsed: true,
+            fallbackReason,
+            latencyMs: Date.now() - startedAt,
+            providerLatencyMs: fallbackLatencyMs,
+          };
+        }
+        console.warn('OpenAI-compatible fallback model returned empty response', {
+          requestedProvider,
+          fallbackModel,
+          fallbackLatencyMs,
+        });
+      } catch (error: any) {
+        console.warn('OpenAI-compatible fallback model failed', {
+          requestedProvider,
+          fallbackModel,
+          errorMessage: error?.message,
+          errorStatus: error?.response?.status,
+          errorData: error?.response?.data,
+        });
+      }
+    }
+    return null;
   };
 
   console.info('Chat model selection started', {
@@ -557,13 +648,29 @@ Use the above data in your response. Now follow the general instructions below.
         openAiModel: OPENAI_COMPAT_CHAT_MODEL,
         gemmaLatencyMs,
       });
+      const emptyFallbackReason = `${requestedProvider}_empty_response`;
+      const openAiFallbackResponse = await callOpenAICompatibleFallbackModels(emptyFallbackReason);
+      if (openAiFallbackResponse) {
+        console.info('Chat model selected', {
+          requestedProvider,
+          providerUsed: openAiFallbackResponse.providerUsed,
+          modelUsed: openAiFallbackResponse.modelUsed,
+          fallbackUsed: openAiFallbackResponse.fallbackUsed,
+          fallbackReason: openAiFallbackResponse.fallbackReason,
+          tokensUsed: openAiFallbackResponse.tokensUsed,
+          latencyMs: openAiFallbackResponse.latencyMs,
+          providerLatencyMs: openAiFallbackResponse.providerLatencyMs,
+        });
+        return JSON.stringify(openAiFallbackResponse);
+      }
+
       const geminiStart = Date.now();
       const geminiResult = await callGeminiChat();
       const response = {
         ...geminiResult,
         requestedProvider,
         fallbackUsed: true,
-        fallbackReason: `${requestedProvider}_empty_response`,
+        fallbackReason: emptyFallbackReason,
         latencyMs: Date.now() - startedAt,
         providerLatencyMs: Date.now() - geminiStart,
       };
@@ -588,6 +695,21 @@ Use the above data in your response. Now follow the general instructions below.
         errorStatus: error?.response?.status,
         errorData: error?.response?.data,
       });
+      const openAiFallbackResponse = await callOpenAICompatibleFallbackModels(fallbackReason);
+      if (openAiFallbackResponse) {
+        console.info('Chat model selected', {
+          requestedProvider,
+          providerUsed: openAiFallbackResponse.providerUsed,
+          modelUsed: openAiFallbackResponse.modelUsed,
+          fallbackUsed: openAiFallbackResponse.fallbackUsed,
+          fallbackReason: openAiFallbackResponse.fallbackReason,
+          tokensUsed: openAiFallbackResponse.tokensUsed,
+          latencyMs: openAiFallbackResponse.latencyMs,
+          providerLatencyMs: openAiFallbackResponse.providerLatencyMs,
+        });
+        return JSON.stringify(openAiFallbackResponse);
+      }
+
       const geminiStart = Date.now();
       const geminiResult = await callGeminiChat();
       const response = {
