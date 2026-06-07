@@ -953,8 +953,17 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
   if (isOpenAICompatibleProvider(requestedProvider)) {
     try {
       const gemmaStart = Date.now();
+      const useCompactPrimaryPrompt = prompt.length > 4000;
+      const primaryVisionPrompt = useCompactPrimaryPrompt ? buildCompactVisionRetryPrompt(prompt) : prompt;
+      if (useCompactPrimaryPrompt) {
+        console.info('Using compact primary vision prompt for long mobile request', {
+          requestedProvider,
+          originalPromptLength: prompt.length,
+          compactPromptLength: primaryVisionPrompt.length,
+        });
+      }
       const gemmaResult = await withTimeout(
-        analyzeImageWithOpenAICompatible(imageBase64, prompt, requestedProvider),
+        analyzeImageWithOpenAICompatible(imageBase64, primaryVisionPrompt, requestedProvider),
         GEMMA4_VISION_TIMEOUT_MS,
         `${requestedProvider}_vision`
       );
@@ -962,7 +971,7 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
 
       if (gemmaResult.analysis && gemmaResult.analysis !== 'Could not analyze image') {
         const enhancedGemmaResult = await maybeEnhanceVisionWithRag(
-          prompt,
+          primaryVisionPrompt,
           gemmaResult,
           (enhancedPrompt) => withTimeout(
             analyzeImageWithOpenAICompatible(imageBase64, enhancedPrompt, requestedProvider),
