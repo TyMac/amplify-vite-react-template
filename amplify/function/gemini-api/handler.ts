@@ -714,7 +714,9 @@ async function analyzeImageWithOpenAICompatible(imageBase64: string, prompt: str
     analysis: extractOpenAIText(result) || 'Could not analyze image',
     tokensUsed: result.usage?.total_tokens || 0,
     modelUsed: OPENAI_COMPAT_VISION_MODEL,
-    providerUsed: resolveOpenAICompatibleProviderLabel(requestedProvider),
+    providerUsed: requestedProvider === 'gemma4'
+      ? 'gemma4'
+      : resolveOpenAICompatibleProviderLabel(requestedProvider),
   };
 }
 
