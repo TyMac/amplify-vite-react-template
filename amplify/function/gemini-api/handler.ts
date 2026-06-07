@@ -847,8 +847,11 @@ async function analyzeImageWithOpenAICompatible(imageBase64: string, prompt: str
   };
 }
 
-function buildCompactVisionRetryPrompt(originalPrompt: string): string {
-  const wantsCanonicalTags = originalPrompt.includes('BARISTA_CANONICAL_TAGS_JSON_START');
+function buildCompactVisionRetryPrompt(_originalPrompt: string): string {
+  // Keep this intentionally short and free of the full mobile canonical-tag list.
+  // Gemma 4 MaaS can return an empty message for the long mobile prompt; the
+  // compact retry is a recovery path whose text is still tag-parsed deterministically
+  // by the mobile client.
   return `You are an expert specialty coffee barista analyzing a coffee bag/label photo.
 
 Extract the visible coffee information. Keep it concise and practical for a mobile chat:
@@ -863,12 +866,7 @@ Extract the visible coffee information. Keep it concise and practical for a mobi
 
 Preserve visible label spellings. Gesha and Geisha are the same variety; do not infer Pink Bourbon unless the label explicitly says it.
 
-If text is partially unreadable, return what is legible and mark uncertain fields. Do not return an empty response.${wantsCanonicalTags ? `
-
-If you can identify obvious canonical coffee tags from the visible label, append them as a JSON string array between these exact markers. Use only obvious human-readable tag names from the label; if unsure, use [].
-BARISTA_CANONICAL_TAGS_JSON_START
-[]
-BARISTA_CANONICAL_TAGS_JSON_END` : ''}`;
+If text is partially unreadable, return what is legible and mark uncertain fields. Do not return an empty response.`;
 }
 
 function buildVisionRagQuery(prompt: string, initialAnalysis: string): string {
