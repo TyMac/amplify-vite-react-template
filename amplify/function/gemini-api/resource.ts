@@ -17,11 +17,12 @@ export const geminiApi = defineFunction({
     VERTEX_LOCATION: "us-south1",
     VERTEX_OPENAI_LOCATION: "global",
     CHAT_MODEL_PROVIDER: "ollama",
-    VISION_MODEL_PROVIDER: "gemini",
+    VISION_MODEL_PROVIDER: "gemma4",
     EXTRACTION_MODEL_PROVIDER: "gemini",
     GEMMA4_MAAS_MODEL: "google/gemma-4-26b-a4b-it-maas",
     // Route Barista chat through the Mac Studio Ollama endpoint exposed by
-    // Home Assistant Cloudflared. Keep vision/extraction on Gemini for now.
+    // Home Assistant Cloudflared. Keep vision on Vertex Gemma 4 MaaS and
+    // extraction on Gemini.
     OPENAI_COMPAT_CHAT_URL: "https://llm.y337.org/v1/chat/completions",
     OPENAI_COMPAT_API_KEY: secret("OPENAI_COMPAT_API_KEY"),
     OPENAI_COMPAT_CHAT_MODEL: "barista:latest",

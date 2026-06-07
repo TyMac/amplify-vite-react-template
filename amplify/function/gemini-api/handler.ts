@@ -120,8 +120,8 @@ function openAICompatibleUrl(): string {
  * payload shape to an external OpenAI-compatible endpoint such as Ollama,
  * Cloudflare, or an on-prem gateway. OPENAI_COMPAT_API_KEY is optional.
  */
-async function callOpenAICompatible(payload: any): Promise<any> {
-  const customUrl = openAICompatibleUrl();
+async function callOpenAICompatible(payload: any, options?: { forceVertex?: boolean }): Promise<any> {
+  const customUrl = options?.forceVertex ? '' : openAICompatibleUrl();
   if (!customUrl) {
     const client = await getGCPClient();
     const url = `https://aiplatform.googleapis.com/v1/projects/${GCP_PROJECT_ID}/locations/${VERTEX_OPENAI_LOCATION}/endpoints/openapi/chat/completions`;
@@ -665,28 +665,34 @@ async function analyzeImageWithGeminiFlash(imageBase64: string, prompt: string) 
  * Analyze image with Gemma 4 MaaS via Vertex AI's OpenAI-compatible endpoint.
  */
 async function analyzeImageWithOpenAICompatible(imageBase64: string, prompt: string, requestedProvider: string) {
-  const result = await callOpenAICompatible({
-    model: OPENAI_COMPAT_VISION_MODEL,
-    stream: false,
-    max_tokens: 512,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:image/jpeg;base64,${imageBase64}`,
+  const result = await callOpenAICompatible(
+    {
+      model: OPENAI_COMPAT_VISION_MODEL,
+      stream: false,
+      max_tokens: 512,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: prompt },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`,
+              },
             },
-          },
-        ],
+          ],
+        },
+      ],
+      chat_template_kwargs: {
+        enable_thinking: false,
       },
-    ],
-    chat_template_kwargs: {
-      enable_thinking: false,
     },
-  });
+    // `gemma4` means the managed Vertex AI Gemma MaaS endpoint. Do not let the
+    // chat-specific Cloudflare/Ollama URL hijack vision when chat is routed to
+    // the external OpenAI-compatible tunnel.
+    { forceVertex: requestedProvider === 'gemma4' }
+  );
 
   return {
     analysis: extractOpenAIText(result) || 'Could not analyze image',
@@ -752,7 +758,9 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
   console.info('Vision model selection started', {
     requestedProvider,
     openAiModel: OPENAI_COMPAT_VISION_MODEL,
-    openAiEndpoint: openAICompatibleUrl() || `vertex:${VERTEX_OPENAI_LOCATION}`,
+    openAiEndpoint: requestedProvider === 'gemma4'
+      ? `vertex:${VERTEX_OPENAI_LOCATION}`
+      : (openAICompatibleUrl() || `vertex:${VERTEX_OPENAI_LOCATION}`),
     promptLength: prompt.length,
     imageBase64Length: imageBase64.length,
   });
