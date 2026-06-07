@@ -880,6 +880,24 @@ async function maybeEnhanceVisionWithRag(
   const enhancedPrompt = buildRagEnhancedVisionPrompt(prompt, initialResult.analysis, ragContext);
   const enhancedResult = await analyzeAgain(enhancedPrompt);
 
+  if (!enhancedResult.analysis || enhancedResult.analysis === 'Could not analyze image') {
+    console.warn('Vision RAG enhancement returned empty analysis; preserving initial image analysis', {
+      ragContextLength: ragContext.length,
+      initialAnalysisLength: initialResult.analysis.length,
+      enhancedModelUsed: enhancedResult.modelUsed,
+      enhancedProviderUsed: enhancedResult.providerUsed,
+      enhancedTokensUsed: enhancedResult.tokensUsed,
+    });
+
+    return {
+      ...initialResult,
+      tokensUsed: initialResult.tokensUsed + enhancedResult.tokensUsed,
+      ragContextUsed: false,
+      ragContextLength: ragContext.length,
+      ragFallbackReason: 'rag_enhancement_empty_response',
+    };
+  }
+
   return {
     ...enhancedResult,
     tokensUsed: initialResult.tokensUsed + enhancedResult.tokensUsed,
