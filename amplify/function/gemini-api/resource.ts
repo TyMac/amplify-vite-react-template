@@ -25,7 +25,7 @@ export const geminiApi = defineFunction({
     // extraction on Gemini.
     OPENAI_COMPAT_CHAT_URL: "https://llm.y337.org/v1/chat/completions",
     OPENAI_COMPAT_API_KEY: secret("OPENAI_COMPAT_API_KEY"),
-    OPENAI_COMPAT_CHAT_MODEL: "barista:latest",
+    OPENAI_COMPAT_CHAT_MODEL: "gemma4:12b",
     OPENAI_COMPAT_MODEL: "google/gemma-4-26b-a4b-it-maas",
     OPENAI_COMPAT_PROVIDER_LABEL: "mac-studio-ollama",
     RAG_ENABLED: "true",
