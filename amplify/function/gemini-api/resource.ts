@@ -33,6 +33,15 @@ export const geminiApi = defineFunction({
     RAG_CONTEXT_MAX_CHARS: "8000",
     GEMMA4_CHAT_TIMEOUT_MS: "15000",
     GEMMA4_VISION_TIMEOUT_MS: "20000",
+    // Stable Gemini fallback. Keep RAG in us-south1, but call Gemini fallback
+    // through us-central1 first because older 2.0 Flash in us-south1 returned
+    // 404, and the Vertex regional API style does not support `global` here.
+    GEMINI_FALLBACK_MODEL: "gemini-2.5-flash-lite",
+    GEMINI_CHAT_FALLBACK_MODELS: "gemini-2.5-flash-lite",
+    GEMINI_FALLBACK_LOCATIONS: "us-central1,us-south1",
+    GEMINI_CHAT_FALLBACK_LOCATIONS: "us-central1,us-south1",
+    GEMINI_VISION_FALLBACK_MODEL: "gemini-2.5-flash-lite",
+    GEMINI_VISION_FALLBACK_LOCATIONS: "us-central1,us-south1",
     // RAG_CORPUS_ID: 'projects/deductive-jet-464913-p8/locations/us-south1/ragCorpora/4611686018427387904',
   },
 });

@@ -32,11 +32,21 @@ const RAG_SIMILARITY_TOP_K = Math.max(1, Math.min(Number(process.env.RAG_SIMILAR
 const RAG_CONTEXT_MAX_CHARS = Math.max(1000, Number(process.env.RAG_CONTEXT_MAX_CHARS || 8000));
 const GEMMA4_CHAT_TIMEOUT_MS = Number(process.env.GEMMA4_CHAT_TIMEOUT_MS || 8000);
 const GEMMA4_VISION_TIMEOUT_MS = Number(process.env.GEMMA4_VISION_TIMEOUT_MS || 20000);
-const GEMINI_CHAT_FALLBACK_MODELS = (process.env.GEMINI_CHAT_FALLBACK_MODELS || 'gemini-2.0-flash-lite-001,gemini-2.0-flash-001')
+const GEMINI_FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
+const GEMINI_CHAT_FALLBACK_MODELS = (process.env.GEMINI_CHAT_FALLBACK_MODELS || GEMINI_FALLBACK_MODEL)
   .split(',')
   .map((model) => model.trim())
   .filter((model, index, models) => model && models.indexOf(model) === index);
-const GEMINI_CHAT_FALLBACK_LOCATIONS = (process.env.GEMINI_CHAT_FALLBACK_LOCATIONS || `${VERTEX_LOCATION},us-central1`)
+const GEMINI_FALLBACK_LOCATIONS = (process.env.GEMINI_FALLBACK_LOCATIONS || `us-central1,${VERTEX_LOCATION}`)
+  .split(',')
+  .map((location) => location.trim())
+  .filter((location, index, locations) => location && locations.indexOf(location) === index);
+const GEMINI_CHAT_FALLBACK_LOCATIONS = (process.env.GEMINI_CHAT_FALLBACK_LOCATIONS || GEMINI_FALLBACK_LOCATIONS.join(','))
+  .split(',')
+  .map((location) => location.trim())
+  .filter((location, index, locations) => location && locations.indexOf(location) === index);
+const GEMINI_VISION_FALLBACK_MODEL = process.env.GEMINI_VISION_FALLBACK_MODEL || GEMINI_FALLBACK_MODEL;
+const GEMINI_VISION_FALLBACK_LOCATIONS = (process.env.GEMINI_VISION_FALLBACK_LOCATIONS || GEMINI_FALLBACK_LOCATIONS.join(','))
   .split(',')
   .map((location) => location.trim())
   .filter((location, index, locations) => location && locations.indexOf(location) === index);
@@ -643,7 +653,7 @@ Use the above data in your response. Now follow the general instructions below.
         return JSON.stringify(response);
       }
 
-      console.warn('OpenAI-compatible chat returned empty response; falling back to Gemini Flash Lite', {
+      console.warn('OpenAI-compatible chat returned empty response; falling back to Gemini', {
         requestedProvider,
         openAiModel: OPENAI_COMPAT_CHAT_MODEL,
         gemmaLatencyMs,
@@ -687,7 +697,7 @@ Use the above data in your response. Now follow the general instructions below.
       return JSON.stringify(response);
     } catch (error: any) {
       const fallbackReason = `${requestedProvider}_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
-      console.error('OpenAI-compatible chat failed; falling back to Gemini Flash Lite', {
+      console.error('OpenAI-compatible chat failed; falling back to Gemini', {
         requestedProvider,
         openAiModel: OPENAI_COMPAT_CHAT_MODEL,
         fallbackReason,
@@ -772,10 +782,10 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): 
 }
 
 /**
- * Analyze image with Gemini Flash fallback.
+ * Analyze image with Gemini fallback.
  */
 async function analyzeImageWithGeminiFlash(imageBase64: string, prompt: string) {
-  const result = await callVertexAI('publishers/google/models/gemini-2.0-flash-001:generateContent', {
+  const payload = {
     contents: [
       {
         role: 'user',
@@ -794,14 +804,33 @@ async function analyzeImageWithGeminiFlash(imageBase64: string, prompt: string) 
       temperature: 0.4,
       maxOutputTokens: 512,
     },
-  });
-
-  return {
-    analysis: result.candidates?.[0]?.content?.parts?.[0]?.text || 'Could not analyze image',
-    tokensUsed: result.usageMetadata?.totalTokenCount || 0,
-    modelUsed: 'gemini-2.0-flash-001',
-    providerUsed: 'gemini',
   };
+
+  const errors: string[] = [];
+  for (const location of GEMINI_VISION_FALLBACK_LOCATIONS) {
+    try {
+      console.log(`Using fallback vision model: ${GEMINI_VISION_FALLBACK_MODEL} in ${location}`);
+      const result = await callVertexAI(`publishers/google/models/${GEMINI_VISION_FALLBACK_MODEL}:generateContent`, payload, location);
+
+      return {
+        analysis: result.candidates?.[0]?.content?.parts?.[0]?.text || 'Could not analyze image',
+        tokensUsed: result.usageMetadata?.totalTokenCount || 0,
+        modelUsed: GEMINI_VISION_FALLBACK_MODEL,
+        providerUsed: 'gemini',
+      };
+    } catch (error: any) {
+      const reason = `${GEMINI_VISION_FALLBACK_MODEL}@${location}:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
+      errors.push(reason);
+      console.warn('Gemini fallback vision attempt failed', {
+        modelUsed: GEMINI_VISION_FALLBACK_MODEL,
+        location,
+        errorMessage: error?.message,
+        errorStatus: error?.response?.status,
+      });
+    }
+  }
+
+  throw new Error(`Gemini fallback vision failed in all configured locations: ${errors.join('; ')}`);
 }
 
 /**
@@ -916,7 +945,7 @@ async function maybeEnhanceVisionWithRag(
 
 /**
  * Analyze image with the configured vision provider. OpenAI-compatible vision is experimental, so
- * fall back to Gemini Flash if Gemma errors or returns an empty response.
+ * fall back to Gemini if Gemma errors or returns an empty response.
  *
  * The AppSync field is still named `geminiVision` for backward compatibility, but the configured
  * provider may be Gemma. Do not rename the field until all clients/schema references migrate.
@@ -1048,7 +1077,7 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
           return JSON.stringify(response);
         }
 
-        console.warn('OpenAI-compatible compact vision retry also returned empty; falling back to Gemini Flash', {
+        console.warn('OpenAI-compatible compact vision retry also returned empty; falling back to Gemini', {
           requestedProvider,
           openAiModel: OPENAI_COMPAT_VISION_MODEL,
           compactPromptLength: compactPrompt.length,
@@ -1056,7 +1085,7 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
           tokensUsed: compactGemmaResult.tokensUsed,
         });
       } catch (compactError: any) {
-        console.error('OpenAI-compatible compact vision retry failed; falling back to Gemini Flash', {
+        console.error('OpenAI-compatible compact vision retry failed; falling back to Gemini', {
           requestedProvider,
           openAiModel: OPENAI_COMPAT_VISION_MODEL,
           compactFallbackReason: `${requestedProvider}_compact_retry_error:${compactError?.response?.status || compactError?.code || compactError?.message || 'unknown'}`,
@@ -1112,7 +1141,7 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
       }
     } catch (error: any) {
       const fallbackReason = `${requestedProvider}_error:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
-      console.error('OpenAI-compatible vision failed; falling back to Gemini Flash', {
+      console.error('OpenAI-compatible vision failed; falling back to Gemini', {
         requestedProvider,
         openAiModel: OPENAI_COMPAT_VISION_MODEL,
         fallbackReason,
@@ -1252,7 +1281,7 @@ Important: If the conversation includes a system message with "Chat tags with se
 
 Return ONLY the JSON object, no markdown, no explanation.`;
 
-  const model = 'gemini-2.0-flash-lite-001';
+  const model = GEMINI_FALLBACK_MODEL;
   const requestedProvider = EXTRACTION_MODEL_PROVIDER;
 
   try {
@@ -1282,7 +1311,27 @@ Return ONLY the JSON object, no markdown, no explanation.`;
           maxOutputTokens: 1024,
         },
       };
-      const result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload);
+      const errors: string[] = [];
+      let result: any | undefined;
+      for (const location of GEMINI_CHAT_FALLBACK_LOCATIONS) {
+        try {
+          console.log(`Using extraction model: ${model} in ${location}`);
+          result = await callVertexAI(`publishers/google/models/${model}:generateContent`, payload, location);
+          break;
+        } catch (error: any) {
+          const reason = `${model}@${location}:${error?.response?.status || error?.code || error?.message || 'unknown'}`;
+          errors.push(reason);
+          console.warn('Gemini extraction attempt failed', {
+            modelUsed: model,
+            location,
+            errorMessage: error?.message,
+            errorStatus: error?.response?.status,
+          });
+        }
+      }
+      if (!result) {
+        throw new Error(`Gemini extraction failed in all configured locations: ${errors.join('; ')}`);
+      }
       responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
       tokensUsed = result.usageMetadata?.totalTokenCount || 0;
     }
