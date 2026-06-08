@@ -852,7 +852,13 @@ function buildCompactVisionRetryPrompt(_originalPrompt: string): string {
   // Gemma 4 MaaS can return an empty message for the long mobile prompt; the
   // compact retry is a recovery path whose text is still tag-parsed deterministically
   // by the mobile client.
-  return `You are analyzing a coffee bag or coffee label image for Barista. Read visible roaster, origin, variety, process, and tasting notes if possible. Return concise text plus confidence.`;
+  return `You are analyzing a coffee bag or coffee label image for Barista. This scan starts a brewing/dial-in conversation, not just OCR.
+
+Read visible roaster, coffee name, origin, variety, process, tasting notes, roast level, and roast date if possible. Return concise text plus confidence.
+
+After the label facts, include one practical brew-starting note from the identified coffee (temperature/range, ratio, method, or technique). Do not only repeat label text.
+
+If no roast date is clearly visible, end with exactly this follow-up question and no other question: "What is the roast date?" Do not ask about equipment before the roast date.`;
 }
 
 function buildVisionRagQuery(prompt: string, initialAnalysis: string): string {
