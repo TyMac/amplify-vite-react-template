@@ -830,6 +830,9 @@ async function analyzeImageWithOpenAICompatible(imageBase64: string, prompt: str
       chat_template_kwargs: {
         enable_thinking: false,
       },
+      reasoning: {
+        effort: 'none',
+      },
     },
     // `gemma4` means the managed Vertex AI Gemma MaaS endpoint. Do not let the
     // chat-specific Cloudflare/Ollama URL hijack vision when chat is routed to
