@@ -962,15 +962,22 @@ async function geminiVision(args: { imageBase64: string; prompt?: string }) {
       const gemmaLatencyMs = Date.now() - gemmaStart;
 
       if (gemmaResult.analysis && gemmaResult.analysis !== 'Could not analyze image') {
-        const enhancedGemmaResult = await maybeEnhanceVisionWithRag(
-          primaryVisionPrompt,
-          gemmaResult,
-          (enhancedPrompt) => withTimeout(
-            analyzeImageWithOpenAICompatible(imageBase64, enhancedPrompt, requestedProvider),
-            GEMMA4_VISION_TIMEOUT_MS,
-            `${requestedProvider}_vision_rag`
-          )
-        );
+        const enhancedGemmaResult = useCompactPrimaryPrompt
+          ? {
+              ...gemmaResult,
+              ragContextUsed: false,
+              ragContextLength: 0,
+              ragFallbackReason: 'rag_skipped_for_compact_mobile_prompt',
+            }
+          : await maybeEnhanceVisionWithRag(
+              primaryVisionPrompt,
+              gemmaResult,
+              (enhancedPrompt) => withTimeout(
+                analyzeImageWithOpenAICompatible(imageBase64, enhancedPrompt, requestedProvider),
+                GEMMA4_VISION_TIMEOUT_MS,
+                `${requestedProvider}_vision_rag`
+              )
+            );
         const response = {
           ...enhancedGemmaResult,
           requestedProvider,
