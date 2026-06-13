@@ -31,7 +31,7 @@ export const geminiApi = defineFunction({
     RAG_ENABLED: "true",
     RAG_SIMILARITY_TOP_K: "4",
     RAG_CONTEXT_MAX_CHARS: "8000",
-    GEMMA4_CHAT_TIMEOUT_MS: "15000",
+    GEMMA4_CHAT_TIMEOUT_MS: "8000",
     GEMMA4_VISION_TIMEOUT_MS: "20000",
     // Stable Gemini fallback. Keep RAG in us-south1, but call Gemini fallback
     // through us-central1 first because older 2.0 Flash in us-south1 returned
