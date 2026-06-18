@@ -20,12 +20,12 @@ export const geminiApi = defineFunction({
     VISION_MODEL_PROVIDER: "gemma4",
     EXTRACTION_MODEL_PROVIDER: "gemini",
     GEMMA4_MAAS_MODEL: "google/gemma-4-26b-a4b-it-maas",
-    // Route Barista chat through OpenRouter (Gemma 4 free). Vision stays on Vertex Gemma 4 MaaS.
+    // Route Barista chat through OpenRouter (Llama 3.2 3B free - faster than Gemma 4 26B).
     OPENAI_COMPAT_CHAT_URL: "https://openrouter.ai/api/v1/chat/completions",
     OPENAI_COMPAT_API_KEY: secret("OPENAI_COMPAT_API_KEY_HOSTED"),
-    OPENAI_COMPAT_CHAT_MODEL: "google/gemma-4-26b-a4b-it:free",
-    OPENAI_COMPAT_MODEL: "google/gemma-4-26b-a4b-it:free",
-    OPENAI_COMPAT_PROVIDER_LABEL: "openrouter-gemma4",
+    OPENAI_COMPAT_CHAT_MODEL: "meta-llama/llama-3.2-3b-instruct:free",
+    OPENAI_COMPAT_MODEL: "meta-llama/llama-3.2-3b-instruct:free",
+    OPENAI_COMPAT_PROVIDER_LABEL: "openrouter-llama3.2-3b",
     RAG_ENABLED: "true",
     RAG_SIMILARITY_TOP_K: "4",
     RAG_CONTEXT_MAX_CHARS: "8000",
