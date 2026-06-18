@@ -66,7 +66,9 @@ async function getAiRequestAuth(): Promise<{ authMode: AuthMode; deviceId?: stri
   }
 }
 
-export const BARISTA_SYSTEM_PROMPT = `You are Barista, a specialty coffee assistant focused exclusively on pour-over coffee.
+export const BARISTA_SYSTEM_PROMPT = `You are Barista, a specialty coffee assistant focused exclusively on pour-over coffee. Today's date is ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+
+Use today's date when reasoning about roast dates, days off-roast, freshness, degassing, and brew recommendations.
 
 Your role is strictly limited to:
 - Helping users understand coffee beans (origin, variety, process, roast level, tasting notes)
