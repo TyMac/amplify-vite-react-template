@@ -16,18 +16,16 @@ export const geminiApi = defineFunction({
       "barista-vertex-ai@deductive-jet-464913-p8.iam.gserviceaccount.com",
     VERTEX_LOCATION: "us-south1",
     VERTEX_OPENAI_LOCATION: "global",
-    CHAT_MODEL_PROVIDER: "ollama",
+    CHAT_MODEL_PROVIDER: "openai-compatible",
     VISION_MODEL_PROVIDER: "gemma4",
     EXTRACTION_MODEL_PROVIDER: "gemini",
     GEMMA4_MAAS_MODEL: "google/gemma-4-26b-a4b-it-maas",
-    // Route Barista chat through the Mac Studio Ollama endpoint exposed by
-    // Home Assistant Cloudflared. Keep vision on Vertex Gemma 4 MaaS and
-    // extraction on Gemini.
-    OPENAI_COMPAT_CHAT_URL: "https://llm.y337.org/v1/chat/completions",
-    OPENAI_COMPAT_API_KEY: secret("OPENAI_COMPAT_API_KEY"),
-    OPENAI_COMPAT_CHAT_MODEL: "llama3.2:latest",
-    OPENAI_COMPAT_MODEL: "google/gemma-4-26b-a4b-it-maas",
-    OPENAI_COMPAT_PROVIDER_LABEL: "mac-studio-ollama",
+    // Route Barista chat through OpenRouter (Gemma 4 free). Vision stays on Vertex Gemma 4 MaaS.
+    OPENAI_COMPAT_CHAT_URL: "https://openrouter.ai/api/v1/chat/completions",
+    OPENAI_COMPAT_API_KEY: secret("OPENAI_COMPAT_API_KEY_HOSTED"),
+    OPENAI_COMPAT_CHAT_MODEL: "google/gemma-4-26b-a4b-it:free",
+    OPENAI_COMPAT_MODEL: "google/gemma-4-26b-a4b-it:free",
+    OPENAI_COMPAT_PROVIDER_LABEL: "openrouter-gemma4",
     RAG_ENABLED: "true",
     RAG_SIMILARITY_TOP_K: "4",
     RAG_CONTEXT_MAX_CHARS: "8000",
